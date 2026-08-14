@@ -3,12 +3,16 @@
 let rowsPromise = null;
 let countryNames = {};
 const SEARCH_LIMIT = 24;
+const DATA_VERSION = '20260814-3';
+const QUERY_ALIASES = new Map([
+  ['goteborg','gothenburg']
+]);
 
 const norm = value => String(value ?? '').trim().toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 
 async function loadRows(){
   if(!rowsPromise){
-    rowsPromise = fetch('./data/world-places.json', {cache:'force-cache'})
+    rowsPromise = fetch(`./data/world-places.json?v=${DATA_VERSION}`, {cache:'no-store'})
       .then(r => { if(!r.ok) throw new Error(`world-places.json ${r.status}`); return r.json(); })
       .then(rows => { postMessage({type:'ready',count:rows.length}); return rows; })
       .catch(err => { rowsPromise=null; throw err; });
@@ -34,7 +38,7 @@ function placeType(row){
   return 'settlement';
 }
 
-function nameScore(row, q){
+function singleNameScore(row, q){
   const canonical=row[9]||'', aliases=row[10]||'';
   if(canonical===q) return 10000;
   if(aliases && aliases.includes(`\u0001${q}\u0001`)) return 9400;
@@ -43,6 +47,13 @@ function nameScore(row, q){
   if(q.length>=3 && canonical.includes(q)) return 5200;
   if(q.length>=3 && aliases.includes(q)) return 4500;
   return 0;
+}
+
+function nameScore(row, q){
+  const direct=singleNameScore(row,q);
+  const alias=QUERY_ALIASES.get(q);
+  if(!alias) return direct;
+  return Math.max(direct,singleNameScore(row,alias)-250);
 }
 
 function qualifierMatch(row, qualifier){
@@ -81,7 +92,7 @@ function searchRows(rows, query, allowedCodes, filterType){
   pool.sort((a,b)=>b.score-a.score || (b.row[7]||0)-(a.row[7]||0) || String(a.row[1]).localeCompare(String(b.row[1])));
   const total=pool.length;
   const results=pool.slice(0,SEARCH_LIMIT).map(({row})=>({
-    geonameId:row[0], id:`gn:${row[0]}`, name:row[1], lat:row[2], lon:row[3], countryCode:row[4], country:countryNames[row[4]]||row[4],
+    geonameId:row[0], id:`gn:${row[0]}`, name:(row[0]===2711537?'Göteborg':row[1]), lat:row[2], lon:row[3], countryCode:row[4], country:countryNames[row[4]]||row[4],
     adminCode:row[5]||'', region:row[6]||'', population:row[7]||0, featureCode:row[8]||'', type:placeType(row)
   }));
   return {results,total};
