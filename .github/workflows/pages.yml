@@ -1,0 +1,45 @@
+name: Publicera Orten 2.0
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Bygg globalt ortregister
+        run: node scripts/build-world-data.mjs
+      - name: Validera världsdatan
+        run: node scripts/validate-world-data.mjs
+      - name: Kontrollera JavaScript
+        run: |
+          node --check app.js
+          node --check place-worker.js
+          node --check data.js
+          node --check scripts/build-world-data.mjs
+          node --check scripts/validate-world-data.mjs
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - name: Publicera
+        id: deployment
+        uses: actions/deploy-pages@v4
