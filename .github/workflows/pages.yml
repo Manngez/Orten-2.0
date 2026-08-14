@@ -34,6 +34,11 @@ jobs:
           for file in app.js app-core.js app-setup.js app-map.js app-search.js app-ui.js place-worker.js data.js scripts/build-world-data.mjs scripts/validate-world-data.mjs; do
             node --check "$file"
           done
+      - name: Versionsmärk klientfiler
+        run: |
+          BUILD="${GITHUB_SHA::12}"
+          sed -i "s|src=\"data.js\"|src=\"data.js?v=$BUILD\"|" index.html
+          sed -i "s|src=\"app.js\"|src=\"app.js?v=$BUILD\"|" index.html
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
