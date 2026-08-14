@@ -31,11 +31,9 @@ jobs:
         run: node scripts/validate-world-data.mjs
       - name: Kontrollera JavaScript
         run: |
-          node --check app.js
-          node --check place-worker.js
-          node --check data.js
-          node --check scripts/build-world-data.mjs
-          node --check scripts/validate-world-data.mjs
+          for file in app.js app-core.js app-setup.js app-map.js app-search.js app-ui.js place-worker.js data.js scripts/build-world-data.mjs scripts/validate-world-data.mjs; do
+            node --check "$file"
+          done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
