@@ -26,14 +26,9 @@
 
     <section class="hero wrap">
       <div class="hero-copy">
-        <span class="eyebrow">HELA VÄRLDEN · EN LINJE · ETT FELSTEG</span>
-        <h1>Bygg världens längsta rutt <span>utan att korsa dig själv.</span></h1>
-        <p>Välj område, ortstorlek, speltyp, regler och kartkänsla innan start. Samma idé som Orten – men med en modern platsmotor och världskarta byggd för fri panorering.</p>
-        <div class="hero-badges">
-          <span>🌍 Global platsökning</span>
-          <span>🧩 Ortsnamn separeras säkert</span>
-          <span>📱 Mobil först</span>
-        </div>
+        <span class="eyebrow">EN ORT I TAGET · UNDVIK KORSNINGEN</span>
+        <h1>Välj. Starta. <span>Rita rutten.</span></h1>
+        <p>Tre enkla steg innan spelet börjar. Allt annat sköts automatiskt.</p>
       </div>
       <div class="globe-card" aria-hidden="true">
         <svg class="globe-art" viewBox="0 0 420 420">
@@ -58,73 +53,36 @@
 
     <section class="wrap setup-grid">
       <div class="setup-main">
-        <section class="panel preset-panel">
-          <div class="panel-heading">
-            <div><span class="step-kicker">SNABBSTART</span><h2>Välj en färdig utmaning</h2></div>
-            <span class="panel-hint">Går att finjustera direkt efteråt</span>
-          </div>
-          <div id="presetGrid" class="preset-grid"></div>
-        </section>
+        <div id="presetGrid" class="hidden" aria-hidden="true"></div>
 
         <section class="panel">
-          <div class="panel-heading"><div><span class="step-kicker">1 · SPELSÄTT</span><h2>Hur vill ni spela?</h2></div></div>
+          <div class="panel-heading"><div><span class="step-kicker">1 · SPELLÄGE</span><h2>Hur vill ni spela?</h2></div></div>
           <div id="modeGrid" class="mode-grid">
             <button type="button" class="mode-card selected" data-mode="classic"><span class="mode-icon">⚡</span><strong>Klassisk</strong><small>Första linjekorsningen avslutar spelet.</small></button>
-            <button type="button" class="mode-card" data-mode="endurance"><span class="mode-icon">🛡️</span><strong>Tålighet</strong><small>Spelarna tål flera korsningar innan de förlorar.</small></button>
-            <button type="button" class="mode-card" data-mode="elimination"><span class="mode-icon">🏆</span><strong>Utslagning</strong><small>Korsar du linjen åker du ut. Ny rutt tills en återstår.</small></button>
-            <button type="button" class="mode-card" data-mode="solo"><span class="mode-icon">🧭</span><strong>Solo</strong><small>Jaga ett eget rekord på valfri del av världen.</small></button>
+            <button type="button" class="mode-card" data-mode="endurance"><span class="mode-icon">🛡️</span><strong>Tålighet</strong><small>Flera korsningar tillåts innan förlust.</small></button>
+            <button type="button" class="mode-card" data-mode="elimination"><span class="mode-icon">🏆</span><strong>Utslagning</strong><small>Korsar du åker du ut. Sista spelaren vinner.</small></button>
+            <button type="button" class="mode-card" data-mode="solo"><span class="mode-icon">🧭</span><strong>Solo</strong><small>Jaga ditt eget rekord.</small></button>
           </div>
         </section>
 
         <section class="panel">
-          <div class="panel-heading"><div><span class="step-kicker">2 · OMRÅDE</span><h2>Var får orterna ligga?</h2></div><span id="scopeCount" class="count-pill">Hela världen</span></div>
+          <div class="panel-heading"><div><span class="step-kicker">2 · OMRÅDE</span><h2>Var spelar ni?</h2></div><span id="scopeCount" class="count-pill">🇸🇪 Sverige</span></div>
           <div class="segmented" id="scopeTabs">
-            <button type="button" class="active" data-scope="world">Världen</button>
-            <button type="button" data-scope="continent">Världsdel</button>
-            <button type="button" data-scope="country">Land</button>
-            <button type="button" data-scope="custom">Egna länder</button>
+            <button type="button" class="active" data-area="sweden">🇸🇪 Sverige</button>
+            <button type="button" data-area="nordic">❄️ Norden</button>
+            <button type="button" data-area="europe">🌍 Europa</button>
+            <button type="button" data-area="world">🌐 Världen</button>
           </div>
 
-          <div class="scope-detail hidden" id="continentBox">
-            <label class="field-label" for="continentSelect">Världsdel</label>
-            <select id="continentSelect" class="select"></select>
-          </div>
-          <div class="scope-detail hidden" id="countryBox">
-            <label class="field-label" for="countrySelect">Land</label>
-            <select id="countrySelect" class="select"></select>
-          </div>
-          <div class="scope-detail hidden" id="customBox">
-            <div class="custom-toolbar">
-              <label class="search-field"><span>⌕</span><input id="countrySearch" type="search" placeholder="Sök land…" autocomplete="off" /></label>
-              <button type="button" class="ghost-button small" id="clearCountriesButton">Rensa</button>
-            </div>
-            <div id="countryChips" class="country-chips" role="group" aria-label="Välj länder"></div>
-          </div>
-        </section>
-
-        <section class="panel two-column-panel">
-          <div>
-            <div class="panel-heading compact"><div><span class="step-kicker">3 · ORTER</span><h2>Vilka platser räknas?</h2></div></div>
-            <div class="option-list" id="placeTypeOptions">
-              <label class="option-row selected"><input type="radio" name="placeType" value="any" checked><span><strong>Alla spelbara orter</strong><small>GeoNames 500+: orter över 500 invånare samt administrativa huvudorter.</small></span></label>
-              <label class="option-row"><input type="radio" name="placeType" value="urban"><span><strong>Städer & större orter</strong><small>5 000+ invånare samt administrativa huvudorter.</small></span></label>
-              <label class="option-row"><input type="radio" name="placeType" value="city"><span><strong>Städer & huvudorter</strong><small>15 000+ invånare samt administrativa huvudorter.</small></span></label>
-            </div>
-          </div>
-          <div>
-            <div class="panel-heading compact"><div><span class="step-kicker">4 · KARTA</span><h2>Välj känsla</h2></div></div>
-            <div class="theme-grid" id="themeGrid">
-              <button type="button" class="theme-card selected" data-theme="night"><span class="theme-preview theme-night"></span><strong>Natt</strong></button>
-              <button type="button" class="theme-card" data-theme="atlas"><span class="theme-preview theme-atlas"></span><strong>Atlas</strong></button>
-              <button type="button" class="theme-card" data-theme="paper"><span class="theme-preview theme-paper"></span><strong>Papper</strong></button>
-            </div>
-            <label class="toggle-row"><span><strong>Smart kartföljning</strong><small>Pausas automatiskt när du själv panorerar.</small></span><input id="autoFollowToggle" type="checkbox" checked><i></i></label>
-            <label class="toggle-row"><span><strong>Ortnamn på kartan</strong><small>Visa namn permanent vid markörerna.</small></span><input id="labelsToggle" type="checkbox"><i></i></label>
+          <div class="hidden" aria-hidden="true">
+            <div id="continentBox" class="hidden"><select id="continentSelect"></select></div>
+            <div id="countryBox" class="hidden"><select id="countrySelect"></select></div>
+            <div id="customBox" class="hidden"><input id="countrySearch" type="search" /><button id="clearCountriesButton" type="button">Rensa</button><div id="countryChips"></div></div>
           </div>
         </section>
 
         <section class="panel">
-          <div class="panel-heading"><div><span class="step-kicker">5 · SPELARE & REGLER</span><h2>Finjustera matchen</h2></div></div>
+          <div class="panel-heading"><div><span class="step-kicker">3 · SPELREGLER</span><h2>Finjustera om ni vill</h2></div><span class="panel-hint">Standardvalen fungerar direkt</span></div>
           <div class="rules-grid">
             <div class="field-card" id="playersCard">
               <div class="field-card-head"><span>Spelare</span><select id="playerCountSelect" class="mini-select"></select></div>
@@ -133,35 +91,45 @@
             <div class="field-card" id="strikeCard">
               <label for="strikeLimitSelect">Korsningar innan förlust</label>
               <select id="strikeLimitSelect" class="select"><option value="2">2 korsningar</option><option value="3">3 korsningar</option><option value="4">4 korsningar</option><option value="5">5 korsningar</option></select>
-              <small>Gäller Tålighet. En tur ger högst en straffpoäng även om flera linjer korsas.</small>
+              <small>Visas bara i Tålighet.</small>
             </div>
             <div class="field-card">
               <label for="timerSelect">Turtid</label>
               <select id="timerSelect" class="select"><option value="0">Ingen tidsgräns</option><option value="30">30 sekunder</option><option value="45">45 sekunder</option><option value="60">60 sekunder</option><option value="90">90 sekunder</option></select>
-              <small>När tiden går ut går turen vidare. Platsvalsrutan pausar tiden.</small>
+              <small>Ingen tidsgräns är standard.</small>
             </div>
             <div class="field-card">
-              <label for="duplicateSelect">Återanvändning av platser</label>
-              <select id="duplicateSelect" class="select"><option value="exact">Samma faktiska plats får inte återanvändas</option><option value="nameCountry">Samma namn i samma land blockeras</option><option value="allow">Tillåt allt</option></select>
-              <small>Standardläget skiljer på två orter med samma namn via GeoNames-id, region, land och koordinater.</small>
+              <label for="duplicateSelect">Samma ort igen</label>
+              <select id="duplicateSelect" class="select"><option value="exact">Samma faktiska plats får inte återanvändas</option><option value="nameCountry">Samma namn i samma land blockeras</option><option value="allow">Tillåt återanvändning</option></select>
+              <small>Orter med samma namn men olika positioner hålls isär.</small>
             </div>
+          </div>
+
+          <div class="hidden" aria-hidden="true">
+            <div id="placeTypeOptions">
+              <label class="option-row selected"><input type="radio" name="placeType" value="any" checked><span>Alla orter</span></label>
+              <label class="option-row"><input type="radio" name="placeType" value="urban"><span>Större orter</span></label>
+              <label class="option-row"><input type="radio" name="placeType" value="city"><span>Städer</span></label>
+            </div>
+            <div id="themeGrid"><button type="button" data-theme="night" class="selected">Natt</button><button type="button" data-theme="atlas">Atlas</button><button type="button" data-theme="paper">Papper</button></div>
+            <input id="autoFollowToggle" type="checkbox" checked />
+            <input id="labelsToggle" type="checkbox" />
           </div>
         </section>
       </div>
 
       <aside class="setup-summary panel">
         <span class="step-kicker">DIN MATCH</span>
-        <h2>Redo att rita rutten?</h2>
+        <h2>Redo?</h2>
         <div id="summaryVisual" class="summary-visual">
           <div class="mini-globe"><span>🌍</span><i></i><i></i><i></i></div>
         </div>
         <div id="summaryRows" class="summary-rows"></div>
-        <div class="setup-note"><strong>Ortnamn utan gissningar</strong><p>Om flera platser matchar ett namn får du alltid välja rätt ort med land, region och koordinat innan draget registreras.</p></div>
         <button id="startButton" class="primary-button start-button" type="button"><span>Starta spelet</span><b>→</b></button>
       </aside>
     </section>
 
-    <footer class="wrap footer">Orten 2.0 använder OpenStreetMap för kartan och ett lokalt GeoNames-register för ortsökning. Ortsdata byggs in vid publicering och söks utan extern geokodning under spelet.</footer>
+    <footer class="wrap footer">Orten 2.0 · Ortsdata från GeoNames · Kartdata från OpenStreetMap/CARTO.</footer>
   </main>
 
   <main id="gameScreen" class="screen game-screen">
