@@ -39,6 +39,72 @@
 
 @keyframes wizardIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
 
+/* Map themes: real separate basemaps, then restrained readability tuning. */
+.theme-preview.theme-night{
+  background-color:#20384a;
+  background-image:
+    radial-gradient(ellipse at 72% 28%,#334d5d 0 15%,transparent 16%),
+    radial-gradient(ellipse at 24% 70%,#2b4658 0 20%,transparent 21%),
+    linear-gradient(rgba(120,190,213,.16) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(120,190,213,.16) 1px,transparent 1px),
+    linear-gradient(135deg,#253f52,#152c3c);
+  background-size:auto,auto,20px 20px,20px 20px,auto;
+}
+.theme-preview.theme-night:after{background:linear-gradient(90deg,#71f4ff,#ff977b)}
+
+.theme-preview.theme-atlas{
+  background-color:#79a9b4;
+  background-image:
+    radial-gradient(ellipse at 74% 27%,#d5c79f 0 16%,transparent 17%),
+    radial-gradient(ellipse at 22% 69%,#cdbd92 0 21%,transparent 22%),
+    radial-gradient(ellipse at 51% 51%,#dfd1aa 0 11%,transparent 12%),
+    linear-gradient(rgba(67,86,72,.13) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(67,86,72,.13) 1px,transparent 1px),
+    linear-gradient(135deg,#8bb7bd,#6797a4);
+  background-size:auto,auto,auto,20px 20px,20px 20px,auto;
+  box-shadow:inset 0 0 20px rgba(72,51,27,.20);
+}
+.theme-preview.theme-atlas:before{
+  background:radial-gradient(circle at 50% 50%,transparent 58%,rgba(73,50,26,.13));
+  opacity:.65;
+}
+.theme-preview.theme-atlas:after{background:linear-gradient(90deg,#1b7992,#c76346)}
+
+.map.theme-night{background:#223a4a}
+.map.theme-night .leaflet-tile-pane{
+  filter:brightness(1.24) saturate(.94) contrast(.96);
+}
+
+.map.theme-atlas{background:#78a6b0}
+.map.theme-atlas .leaflet-tile-pane{
+  filter:sepia(.10) saturate(1.48) contrast(1.16) brightness(.93);
+}
+.map.theme-atlas:before{
+  background:
+    repeating-linear-gradient(0deg,rgba(78,54,29,.035) 0,rgba(78,54,29,.035) 1px,transparent 1px,transparent 5px),
+    linear-gradient(rgba(87,66,40,.055) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(87,66,40,.055) 1px,transparent 1px),
+    linear-gradient(135deg,rgba(229,199,145,.10),rgba(63,118,129,.025));
+  background-size:auto,180px 180px,180px 180px,auto;
+  mix-blend-mode:multiply;
+  opacity:.52;
+}
+.map.theme-atlas:after{
+  background:
+    radial-gradient(circle at 50% 48%,transparent 56%,rgba(72,48,27,.12) 100%),
+    linear-gradient(180deg,rgba(255,247,222,.02),rgba(70,45,24,.035));
+  mix-blend-mode:multiply;
+  opacity:.72;
+}
+#gameScreen.theme-atlas-ui .map-vignette{
+  box-shadow:inset 0 0 72px rgba(57,38,20,.18);
+  background:transparent;
+}
+
+.map.theme-paper .leaflet-tile-pane{
+  filter:grayscale(.62) sepia(.24) brightness(1.02) contrast(.94);
+}
+
 @media(max-width:760px){
   #setupScreen[data-setup-step="1"] .hero{display:none}
   .setup-wizard-nav{grid-template-columns:84px 1fr 62px;gap:8px;margin-top:4px;margin-bottom:14px}

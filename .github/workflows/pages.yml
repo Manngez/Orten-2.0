@@ -31,7 +31,7 @@ jobs:
         run: node scripts/validate-world-data.mjs
       - name: Kontrollera JavaScript
         run: |
-          for file in app.js app-core.js app-setup.js app-map.js app-search.js app-ui.js place-worker.js data.js scripts/build-world-data.mjs scripts/validate-world-data.mjs; do
+          for file in app.js app-core.js app-setup.js app-map.js map-themes.js app-search.js app-ui.js place-worker.js data.js scripts/build-world-data.mjs scripts/validate-world-data.mjs; do
             node --check "$file"
           done
       - name: Versionsmärk klientfiler
