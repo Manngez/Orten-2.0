@@ -105,13 +105,22 @@
             </div>
           </div>
 
+          <div class="field-card" style="margin-top:12px">
+            <label>Kartutseende</label>
+            <div id="themeGrid" class="theme-grid">
+              <button type="button" class="theme-card selected" data-theme="night"><span class="theme-preview theme-night"></span><strong>Natt</strong></button>
+              <button type="button" class="theme-card" data-theme="atlas"><span class="theme-preview theme-atlas"></span><strong>Atlas</strong></button>
+              <button type="button" class="theme-card" data-theme="paper"><span class="theme-preview theme-paper"></span><strong>Papper</strong></button>
+            </div>
+            <small>Bakgrundskartan är fortfarande utan ortnamn i alla tre lägen.</small>
+          </div>
+
           <div class="hidden" aria-hidden="true">
             <div id="placeTypeOptions">
               <label class="option-row selected"><input type="radio" name="placeType" value="any" checked><span>Alla orter</span></label>
               <label class="option-row"><input type="radio" name="placeType" value="urban"><span>Större orter</span></label>
               <label class="option-row"><input type="radio" name="placeType" value="city"><span>Städer</span></label>
             </div>
-            <div id="themeGrid"><button type="button" data-theme="night" class="selected">Natt</button><button type="button" data-theme="atlas">Atlas</button><button type="button" data-theme="paper">Papper</button></div>
             <input id="autoFollowToggle" type="checkbox" checked />
             <input id="labelsToggle" type="checkbox" />
           </div>
