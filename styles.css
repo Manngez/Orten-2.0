@@ -1,3 +1,55 @@
 @import url("./styles-base.css");
 @import url("./styles-game.css");
 @import url("./styles-responsive.css");
+
+/* Three-step setup flow */
+#setupScreen .setup-main>section.panel{display:none}
+#setupScreen .setup-main>section.panel.wizard-current{display:block;animation:wizardIn .28s ease both}
+#setupScreen .setup-summary{display:none}
+#setupScreen .setup-summary.wizard-visible{display:block;animation:wizardIn .28s ease both}
+#setupScreen[data-setup-step="1"] .setup-grid,
+#setupScreen[data-setup-step="2"] .setup-grid{display:block;max-width:920px;margin-inline:auto}
+#setupScreen[data-setup-step="3"] .setup-grid{grid-template-columns:minmax(0,1fr) 330px}
+#setupScreen[data-setup-step="2"] .hero,
+#setupScreen[data-setup-step="3"] .hero{display:none}
+#setupScreen[data-setup-step="1"] .hero{padding-bottom:28px}
+
+.setup-wizard-nav{display:grid;grid-template-columns:120px 1fr 120px;align-items:center;gap:18px;margin-top:6px;margin-bottom:22px}
+.wizard-back{border:0;background:transparent;color:#b9cad6;font-weight:750;text-align:left;padding:10px 0;min-height:42px}
+.wizard-back:hover{color:var(--cyan)}
+.wizard-back.invisible{visibility:hidden}
+.wizard-step-text{text-align:right;color:var(--muted);font-size:12px;font-weight:750}
+.wizard-progress{display:flex;align-items:center;justify-content:center;gap:10px}
+.wizard-progress>i{width:min(62px,7vw);height:1px;background:var(--line)}
+.wizard-progress>span{display:flex;align-items:center;gap:7px;color:#70899b;transition:.18s}
+.wizard-progress b{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;border:1px solid var(--line);background:#091725;font-size:11px}
+.wizard-progress small{font-size:11px;font-weight:800}
+.wizard-progress span.active{color:#fff}
+.wizard-progress span.active b{border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 18px rgba(104,246,255,.16)}
+.wizard-progress span.done{color:#9fb5c7}
+.wizard-progress span.done b{background:rgba(104,246,255,.12);border-color:rgba(104,246,255,.4);color:var(--cyan)}
+
+#setupScreen[data-setup-step="1"] .mode-card,
+#setupScreen[data-setup-step="2"] .segmented button{min-height:116px}
+#setupScreen[data-setup-step="2"] .segmented{gap:10px;background:transparent;border:0;padding:0}
+#setupScreen[data-setup-step="2"] .segmented button{border:1px solid var(--line);background:rgba(8,21,35,.74);border-radius:16px;color:#e6f0f5;font-size:15px}
+#setupScreen[data-setup-step="2"] .segmented button:hover{transform:translateY(-2px);border-color:rgba(104,246,255,.46);background:rgba(104,246,255,.06)}
+#setupScreen[data-setup-step="2"] .segmented button.active{border-color:var(--cyan);background:rgba(104,246,255,.08);box-shadow:0 0 0 1px rgba(104,246,255,.12),0 0 28px rgba(104,246,255,.08)}
+
+@keyframes wizardIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+
+@media(max-width:760px){
+  #setupScreen[data-setup-step="1"] .hero{display:none}
+  .setup-wizard-nav{grid-template-columns:84px 1fr 62px;gap:8px;margin-top:4px;margin-bottom:14px}
+  .wizard-progress{gap:5px}
+  .wizard-progress>i{width:18px}
+  .wizard-progress small{display:none}
+  .wizard-step-text{font-size:10px}
+  .wizard-back{font-size:12px}
+  #setupScreen[data-setup-step="3"] .setup-grid{display:block}
+  #setupScreen[data-setup-step="3"] .setup-summary.wizard-visible{margin-top:14px}
+  #setupScreen[data-setup-step="1"] .mode-grid{grid-template-columns:1fr 1fr}
+  #setupScreen[data-setup-step="1"] .mode-card{min-height:122px}
+  #setupScreen[data-setup-step="2"] .segmented{grid-template-columns:1fr 1fr}
+  #setupScreen[data-setup-step="2"] .segmented button{min-height:96px}
+}
