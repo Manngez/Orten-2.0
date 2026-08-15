@@ -5,7 +5,7 @@
   function initMap(){
     if(!map){
       map=L.map('map',{zoomControl:false,minZoom:2,maxZoom:18,worldCopyJump:true,zoomSnap:.25,zoomDelta:.5,wheelPxPerZoomLevel:80,inertia:true,preferCanvas:true}).setView([20,0],2.3);
-      tileLayer=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);
+      tileLayer=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
       routeLayer=L.layerGroup().addTo(map);
       map.on('dragstart',markUserNavigation);
       map.on('click',()=>document.querySelector('.left-panel')?.classList.remove('open'));
