@@ -1,3 +1,5 @@
+  let setupStep = 1;
+
   function updateSummary(){
     const timer=settings.timer?`${settings.timer} sek`:'Ingen';
     const playerText=settings.mode==='solo'?'1 spelare':`${settings.playerCount} spelare`;
@@ -5,6 +7,60 @@
     els.summaryRows.innerHTML=[
       ['Spelläge',`${modeIcon()} ${modeLabel()}`],['Område',scopeLabel()],['Spelare',playerText],['Regel',extra],['Turtid',timer]
     ].map(([a,b])=>`<div class="summary-row"><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`).join('');
+  }
+
+  function setupPanels(){
+    return [...document.querySelectorAll('#setupScreen .setup-main > section.panel')].slice(0,3);
+  }
+
+  function ensureSetupWizard(){
+    const grid=document.querySelector('#setupScreen .setup-grid');
+    if(!grid || $('setupWizardNav')) return;
+    const nav=document.createElement('div');
+    nav.id='setupWizardNav';
+    nav.className='setup-wizard-nav wrap';
+    nav.innerHTML=`
+      <button id="setupBackButton" class="wizard-back" type="button" aria-label="Gå tillbaka">← Tillbaka</button>
+      <div class="wizard-progress" aria-label="Inställningssteg">
+        <span data-wizard-dot="1"><b>1</b><small>Spelläge</small></span>
+        <i></i>
+        <span data-wizard-dot="2"><b>2</b><small>Område</small></span>
+        <i></i>
+        <span data-wizard-dot="3"><b>3</b><small>Regler</small></span>
+      </div>
+      <span id="setupStepText" class="wizard-step-text">Steg 1 av 3</span>`;
+    grid.parentNode.insertBefore(nav,grid);
+    $('setupBackButton').addEventListener('click',()=>showSetupStep(setupStep-1));
+    renderSetupStep(false);
+  }
+
+  function renderSetupStep(animate=true){
+    const screen=$('setupScreen');
+    if(!screen)return;
+    setupStep=clamp(setupStep,1,3);
+    screen.dataset.setupStep=String(setupStep);
+    const panels=setupPanels();
+    panels.forEach((panel,index)=>panel.classList.toggle('wizard-current',index===setupStep-1));
+    document.querySelector('#setupScreen .setup-summary')?.classList.toggle('wizard-visible',setupStep===3);
+    document.querySelectorAll('[data-wizard-dot]').forEach(dot=>{
+      const step=Number(dot.dataset.wizardDot);
+      dot.classList.toggle('active',step===setupStep);
+      dot.classList.toggle('done',step<setupStep);
+    });
+    const back=$('setupBackButton');
+    if(back) back.classList.toggle('invisible',setupStep===1);
+    const text=$('setupStepText');
+    if(text) text.textContent=`Steg ${setupStep} av 3`;
+    if(animate){
+      const heading=panels[setupStep-1]?.querySelector('h2');
+      requestAnimationFrame(()=>heading?.focus?.({preventScroll:true}));
+      window.scrollTo({top:0,behavior:'smooth'});
+    }
+  }
+
+  function showSetupStep(step){
+    setupStep=clamp(step,1,3);
+    renderSetupStep(true);
   }
 
   function selectSimpleArea(area){
@@ -22,8 +78,17 @@
   }
 
   function bindSetupEvents(){
-    els.modeGrid.addEventListener('click',e=>{const b=e.target.closest('[data-mode]');if(!b)return;settings.mode=b.dataset.mode;settings.preset=null;normalizePlayerCount();updateSetupUI(false)});
-    els.scopeTabs.addEventListener('click',e=>{const b=e.target.closest('[data-area]');if(!b)return;selectSimpleArea(b.dataset.area)});
+    ensureSetupWizard();
+    els.modeGrid.addEventListener('click',e=>{
+      const b=e.target.closest('[data-mode]');if(!b)return;
+      settings.mode=b.dataset.mode;settings.preset=null;normalizePlayerCount();updateSetupUI(false);
+      setTimeout(()=>showSetupStep(2),120);
+    });
+    els.scopeTabs.addEventListener('click',e=>{
+      const b=e.target.closest('[data-area]');if(!b)return;
+      selectSimpleArea(b.dataset.area);
+      setTimeout(()=>showSetupStep(3),120);
+    });
     els.continentSelect.addEventListener('change',()=>{settings.continent=els.continentSelect.value;settings.preset=null;updateSetupUI(false)});
     els.countrySelect.addEventListener('change',()=>{settings.country=els.countrySelect.value;settings.preset=null;updateSetupUI(false)});
     els.countrySearch.addEventListener('input',()=>renderCountryChips(els.countrySearch.value));
