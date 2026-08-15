@@ -37,8 +37,12 @@ jobs:
       - name: Versionsmärk klientfiler
         run: |
           BUILD="${GITHUB_SHA::12}"
+          sed -i "s|href=\"styles.css\"|href=\"styles.css?v=$BUILD\"|" index.html
           sed -i "s|src=\"data.js\"|src=\"data.js?v=$BUILD\"|" index.html
           sed -i "s|src=\"app.js\"|src=\"app.js?v=$BUILD\"|" index.html
+          for css in styles-base.css styles-game.css styles-responsive.css styles-atlas.css; do
+            sed -i "s|\"./$css\"|\"./$css?v=$BUILD\"|" styles.css
+          done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
