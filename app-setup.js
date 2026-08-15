@@ -5,7 +5,7 @@
     const playerText=settings.mode==='solo'?'1 spelare':`${settings.playerCount} spelare`;
     const extra=settings.mode==='endurance'?`${settings.strikeLimit} korsningar`:settings.mode==='elimination'?'Sista kvar vinner':'1 korsning';
     els.summaryRows.innerHTML=[
-      ['Spelläge',`${modeIcon()} ${modeLabel()}`],['Område',scopeLabel()],['Spelare',playerText],['Regel',extra],['Turtid',timer]
+      ['Spelläge',`${modeIcon()} ${modeLabel()}`],['Område',scopeLabel()],['Spelare',playerText],['Regel',extra],['Turtid',timer],['Karta',themeLabel()]
     ].map(([a,b])=>`<div class="summary-row"><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`).join('');
   }
 
