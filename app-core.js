@@ -3,6 +3,7 @@
   const D = window.OrtenData;
   const PLAYER_COLORS = ['#68f6ff','#ff8f70','#ffd86a','#73f5a7','#c69cff','#75a7ff'];
   const SEARCH_CACHE_LIMIT = 120;
+  const NORDIC_CODES = ['SE','NO','FI','DK','IS'];
 
   const $ = id => document.getElementById(id);
   const els = {};
@@ -23,10 +24,10 @@
   let placeChooserOpen = false;
 
   const settings = {
-    mode: 'classic', scope: 'world', continent: 'europe', country: 'SE', countries: [],
+    mode: 'classic', scope: 'country', continent: 'europe', country: 'SE', countries: [],
     placeType: 'any', mapTheme: 'night', autoFollow: true, labels: false,
     playerCount: 2, playerNames: ['Spelare 1','Spelare 2','Spelare 3','Spelare 4','Spelare 5','Spelare 6'],
-    strikeLimit: 2, timer: 0, duplicatePolicy: 'exact', preset: 'world'
+    strikeLimit: 2, timer: 0, duplicatePolicy: 'exact', preset: null
   };
 
   const game = {
@@ -140,10 +141,24 @@
     return null;
   }
 
+  function isNordicScope(s=settings){
+    if(s.scope!=='custom' || (s.countries||[]).length!==NORDIC_CODES.length) return false;
+    const set=new Set(s.countries||[]);
+    return NORDIC_CODES.every(code=>set.has(code));
+  }
+
+  function currentAreaKey(s=settings){
+    if(s.scope==='country' && s.country==='SE') return 'sweden';
+    if(isNordicScope(s)) return 'nordic';
+    if(s.scope==='continent' && s.continent==='europe') return 'europe';
+    return 'world';
+  }
+
   function scopeLabel(s=settings){
     if(s.scope==='world') return 'Världen';
     if(s.scope==='continent') return D.CONTINENT_META[s.continent]?.name || 'Världsdel';
     if(s.scope==='country') return `${D.flag(s.country)} ${D.countryName(s.country)}`;
+    if(isNordicScope(s)) return '❄️ Norden';
     const codes=s.countries||[];
     if(!codes.length) return 'Inga länder valda';
     if(codes.length<=3) return codes.map(c=>`${D.flag(c)} ${D.countryName(c)}`).join(', ');
@@ -160,8 +175,9 @@
   function updateSetupUI(rebuildCountries=false){
     normalizePlayerCount(); renderPresets();
     els.modeGrid.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===settings.mode));
-    els.scopeTabs.querySelectorAll('[data-scope]').forEach(b=>b.classList.toggle('active',b.dataset.scope===settings.scope));
-    els.continentBox.classList.toggle('hidden',settings.scope!=='continent'); els.countryBox.classList.toggle('hidden',settings.scope!=='country'); els.customBox.classList.toggle('hidden',settings.scope!=='custom');
+    const area=currentAreaKey();
+    els.scopeTabs.querySelectorAll('[data-area]').forEach(b=>b.classList.toggle('active',b.dataset.area===area));
+    els.continentBox.classList.add('hidden'); els.countryBox.classList.add('hidden'); els.customBox.classList.add('hidden');
     els.continentSelect.value=settings.continent; els.countrySelect.value=settings.country;
     if(rebuildCountries) renderCountryChips(els.countrySearch.value);
     els.scopeCount.textContent=scopeLabel();
