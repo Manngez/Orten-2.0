@@ -3,13 +3,27 @@
     const playerText=settings.mode==='solo'?'1 spelare':`${settings.playerCount} spelare`;
     const extra=settings.mode==='endurance'?`${settings.strikeLimit} korsningar`:settings.mode==='elimination'?'Sista kvar vinner':'1 korsning';
     els.summaryRows.innerHTML=[
-      ['Spelsätt',`${modeIcon()} ${modeLabel()}`],['Område',scopeLabel()],['Orter',placeTypeLabel()],['Spelare',playerText],['Korsningsregel',extra],['Turtid',timer],['Karta',themeLabel()]
+      ['Spelläge',`${modeIcon()} ${modeLabel()}`],['Område',scopeLabel()],['Spelare',playerText],['Regel',extra],['Turtid',timer]
     ].map(([a,b])=>`<div class="summary-row"><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`).join('');
+  }
+
+  function selectSimpleArea(area){
+    settings.preset=null;
+    if(area==='sweden'){
+      settings.scope='country'; settings.country='SE'; settings.continent='europe'; settings.countries=[];
+    }else if(area==='nordic'){
+      settings.scope='custom'; settings.countries=[...NORDIC_CODES]; settings.continent='europe';
+    }else if(area==='europe'){
+      settings.scope='continent'; settings.continent='europe'; settings.countries=[];
+    }else{
+      settings.scope='world'; settings.countries=[];
+    }
+    updateSetupUI(false);
   }
 
   function bindSetupEvents(){
     els.modeGrid.addEventListener('click',e=>{const b=e.target.closest('[data-mode]');if(!b)return;settings.mode=b.dataset.mode;settings.preset=null;normalizePlayerCount();updateSetupUI(false)});
-    els.scopeTabs.addEventListener('click',e=>{const b=e.target.closest('[data-scope]');if(!b)return;settings.scope=b.dataset.scope;settings.preset=null;updateSetupUI(false)});
+    els.scopeTabs.addEventListener('click',e=>{const b=e.target.closest('[data-area]');if(!b)return;selectSimpleArea(b.dataset.area)});
     els.continentSelect.addEventListener('change',()=>{settings.continent=els.continentSelect.value;settings.preset=null;updateSetupUI(false)});
     els.countrySelect.addEventListener('change',()=>{settings.country=els.countrySelect.value;settings.preset=null;updateSetupUI(false)});
     els.countrySearch.addEventListener('input',()=>renderCountryChips(els.countrySearch.value));
@@ -22,10 +36,7 @@
     els.strikeLimitSelect.addEventListener('change',()=>{settings.strikeLimit=Number(els.strikeLimitSelect.value);settings.preset=null;updateSummary()});
     els.timerSelect.addEventListener('change',()=>{settings.timer=Number(els.timerSelect.value);settings.preset=null;updateSummary()});
     els.duplicateSelect.addEventListener('change',()=>{settings.duplicatePolicy=els.duplicateSelect.value;settings.preset=null;updateSummary()});
-    els.startButton.addEventListener('click',()=>{
-      if(settings.scope==='custom' && !settings.countries.length) return toast('Välj minst ett land för området Egna länder.','error');
-      startGame();
-    });
+    els.startButton.addEventListener('click',()=>startGame());
     els.soundButton.addEventListener('click',()=>{const off=storageGet('orten2:sound')==='off';storageSet('orten2:sound',off?'on':'off');updateSound();if(off)tone('move')});
     els.howToButton.addEventListener('click',()=>els.howToModal.classList.remove('hidden'));
     els.howToClose.addEventListener('click',()=>els.howToModal.classList.add('hidden'));
@@ -36,7 +47,7 @@
     if(s.preset && D.PRESETS[s.preset]?.center) return {center:D.PRESETS[s.preset].center,zoom:D.PRESETS[s.preset].zoom};
     if(s.scope==='continent'){const m=D.CONTINENT_META[s.continent];return {center:m?.center||[20,0],zoom:m?.zoom||2.5};}
     if(s.scope==='country' && s.country==='SE') return {center:[62,15],zoom:4.2};
-    if(s.scope==='custom' && ['SE','NO','FI','DK','IS'].every(c=>s.countries.includes(c)) && s.countries.length===5) return {center:[64,14],zoom:3.5};
+    if(isNordicScope(s)) return {center:[64,14],zoom:3.5};
     return {center:[20,0],zoom:2.3};
   }
 
