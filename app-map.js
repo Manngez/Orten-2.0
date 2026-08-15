@@ -2,10 +2,26 @@
     [els.placeModal,els.resultModal,els.pauseModal].forEach(m=>m.classList.add('hidden')); placeChooserOpen=false;
   }
 
+  const MAP_TILE_URLS = {
+    default:'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
+    atlas:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png'
+  };
+
+  function tileUrlForTheme(theme){ return theme==='atlas' ? MAP_TILE_URLS.atlas : MAP_TILE_URLS.default; }
+
+  function applyMapTheme(theme){
+    const safe=['night','atlas','paper'].includes(theme)?theme:'night';
+    els.map.classList.remove('theme-night','theme-atlas','theme-paper');
+    els.map.classList.add(`theme-${safe}`);
+    els.gameScreen.classList.remove('theme-night-ui','theme-atlas-ui','theme-paper-ui');
+    els.gameScreen.classList.add(`theme-${safe}-ui`);
+    tileLayer?.setUrl(tileUrlForTheme(safe));
+  }
+
   function initMap(){
     if(!map){
       map=L.map('map',{zoomControl:false,minZoom:2,maxZoom:18,worldCopyJump:true,zoomSnap:.25,zoomDelta:.5,wheelPxPerZoomLevel:80,inertia:true,preferCanvas:true}).setView([20,0],2.3);
-      tileLayer=L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
+      tileLayer=L.tileLayer(tileUrlForTheme(game.settings?.mapTheme),{subdomains:'abcd',maxZoom:20,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'}).addTo(map);
       routeLayer=L.layerGroup().addTo(map);
       map.on('dragstart',markUserNavigation);
       map.on('click',()=>document.querySelector('.left-panel')?.classList.remove('open'));
@@ -13,7 +29,7 @@
       container.addEventListener('wheel',markUserNavigation,{passive:true}); container.addEventListener('touchstart',markUserNavigation,{passive:true});
       map.on('moveend zoomend',()=>{if(mapProgrammatic) mapProgrammatic=false;});
     }
-    els.map.classList.remove('theme-night','theme-atlas','theme-paper'); els.map.classList.add(`theme-${game.settings.mapTheme}`);
+    applyMapTheme(game.settings.mapTheme);
     setTimeout(()=>map.invalidateSize(),80); renderMap();
   }
 
