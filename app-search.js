@@ -137,7 +137,7 @@
     const host=$('globalHighscoreResult');
     if(!host)return;
     if(!GLOBAL_SCORE){host.classList.remove('syncing');host.innerHTML='<strong>⌁</strong><span>LOKALT SPARAT · GLOBAL TJÄNST EJ LADDAD</span>';return}
-    const snapshot={settings:JSON.parse(JSON.stringify(game.settings)),playerName:game.players[0]?.name,score:game.route.length};
+    const snapshot={settings:JSON.parse(JSON.stringify(game.settings)),playerName:game.players[0]?.name,score:game.route.length,source:'solo-result'};
     try{
       const result=await GLOBAL_SCORE.record(snapshot);
       if(!host.isConnected)return;
@@ -153,6 +153,7 @@
   }
   function showFinalResult({kind,loser,winner}){
     els.continueButton.classList.add('hidden');els.playAgainButton.classList.remove('hidden');els.changeSettingsButton.classList.remove('hidden');
+    $('resultHighscoreButton')?.classList.toggle('hidden',kind!=='solo');
     if(kind==='winner'){els.resultIcon.textContent='🏆';els.resultTitle.textContent=`${winner?.name||'Vinnaren'} vinner!`;els.resultText.textContent=`Alla andra spelare har slagits ut efter ${game.round} rundor.`;}
     else if(kind==='duel'){
       const loserIndex=game.players.indexOf(loser),winnerIndex=game.players.indexOf(winner);const loserMoves=DUEL.playerMoveCount(game.route,loserIndex),winnerMoves=DUEL.playerMoveCount(game.route,winnerIndex);
@@ -166,6 +167,7 @@
   }
 
   function showEliminationRoundResult(loser){
+    $('resultHighscoreButton')?.classList.add('hidden');
     els.resultIcon.textContent='💥';els.resultTitle.textContent=`${loser.name} är utslagen`;els.resultText.textContent=`Runda ${game.round} slutade efter ${game.roundMoves} orter. En ny tom rutt startar med ${game.players.filter(p=>p.active).length} spelare kvar.`;els.resultStats.innerHTML=statCards();
     els.continueButton.classList.remove('hidden');els.playAgainButton.classList.add('hidden');els.changeSettingsButton.classList.add('hidden');els.resultModal.classList.remove('hidden');
   }
