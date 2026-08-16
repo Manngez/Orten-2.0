@@ -1,4 +1,5 @@
   const SCORE = window.OrtenHighscore;
+  const GLOBAL_SCORE = window.OrtenGlobalHighscore;
 
   function ensureSearchWorker(){
     if(searchWorker) return searchWorker;
@@ -109,9 +110,30 @@
   }
   function highscoreStat(result){
     if(!result?.eligible)return '';
-    if(result.personalBest)return `<div class="result-stat highscore-best"><strong>#${result.rank||'–'}</strong><span>NYTT PERSONBÄSTA · ${result.score} ORTER</span></div>`;
-    if(result.previousBest!=null)return `<div class="result-stat"><strong>${result.previousBest}</strong><span>PERSONBÄSTA · PLATS #${result.rank||'–'}</span></div>`;
+    if(result.personalBest)return `<div class="result-stat highscore-best"><strong>#${result.rank||'–'}</strong><span>NYTT LOKALT PB · ${result.score} ORTER</span></div>`;
+    if(result.previousBest!=null)return `<div class="result-stat"><strong>${result.previousBest}</strong><span>LOKALT PERSONBÄSTA · PLATS #${result.rank||'–'}</span></div>`;
     return '';
+  }
+  function globalHighscorePlaceholder(){
+    return `<div class="result-stat global-highscore-stat syncing" id="globalHighscoreResult"><strong>…</strong><span>SYNKAR GLOBAL HIGHSCORE</span></div>`;
+  }
+  async function syncGlobalHighscore(){
+    const host=$('globalHighscoreResult');
+    if(!host)return;
+    if(!GLOBAL_SCORE){host.classList.remove('syncing');host.innerHTML='<strong>⌁</strong><span>LOKALT SPARAT · GLOBAL TJÄNST EJ LADDAD</span>';return}
+    const snapshot={settings:JSON.parse(JSON.stringify(game.settings)),playerName:game.players[0]?.name,score:game.route.length};
+    try{
+      const result=await GLOBAL_SCORE.record(snapshot);
+      if(!host.isConnected)return;
+      host.classList.remove('syncing','sync-error');host.classList.add('synced');
+      if(result.personalBest)host.innerHTML=`<strong>#${result.rank||'–'}</strong><span>NYTT GLOBALT PB · ${result.score} ORTER</span>`;
+      else host.innerHTML=`<strong>#${result.rank||'–'}</strong><span>GLOBALT PB · ${result.score} ORTER</span>`;
+      window.dispatchEvent(new CustomEvent('orten:global-highscore-updated',{detail:result}));
+    }catch(err){
+      console.warn('Global highscore kunde inte synkas.',err);
+      if(!host.isConnected)return;
+      host.classList.remove('syncing');host.classList.add('sync-error');host.innerHTML='<strong>⌁</strong><span>LOKALT SPARAT · GLOBAL SYNK MISSLYCKADES</span>';
+    }
   }
   function showFinalResult({kind,loser,winner}){
     els.continueButton.classList.add('hidden');els.playAgainButton.classList.remove('hidden');els.changeSettingsButton.classList.remove('hidden');
@@ -119,7 +141,8 @@
     else if(kind==='solo'){els.resultIcon.textContent='🧭';els.resultTitle.textContent='Rutten korsades';els.resultText.textContent=`Din rutt nådde ${game.route.length} orter innan en ny sträcka skar en tidigare linje.`;}
     else{els.resultIcon.textContent='⚡';els.resultTitle.textContent=`${loser?.name||'Spelaren'} korsade linjen`;els.resultText.textContent=`Rutten höll i ${game.roundMoves} orter. Den korsade sträckan är markerad på kartan.`;}
     const highscore=kind==='solo'?recordSoloHighscore():null;
-    els.resultStats.innerHTML=statCards()+highscoreStat(highscore);els.resultModal.classList.remove('hidden');
+    els.resultStats.innerHTML=statCards()+highscoreStat(highscore)+(kind==='solo'?globalHighscorePlaceholder():'');els.resultModal.classList.remove('hidden');
+    if(kind==='solo')syncGlobalHighscore();
   }
 
   function showEliminationRoundResult(loser){
