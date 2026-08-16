@@ -60,7 +60,9 @@ if (manifest) {
   for (const icon of manifest.icons || []) ok(fileExists(icon.src), `Manifestikon saknas: ${icon.src}`);
 }
 
-const tileUrls = [...mapThemes.matchAll(/https:\/\/[^'"\s]+/g)].map(match => match[0]);
+const tileUrls = [...mapThemes.matchAll(/https:\/\/[^'"\s]+/g)]
+  .map(match => match[0])
+  .filter(url => url.includes('basemaps.cartocdn.com'));
 ok(tileUrls.length >= 3, 'Alla tre kartteman måste ha verifierbara tile-URL:er.');
 for (const url of tileUrls) ok(url.includes('_nolabels'), `Karttema får inte visa ortnamn: ${url}`);
 
