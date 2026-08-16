@@ -33,6 +33,7 @@ const PRECACHE = [
   './app-online.js',
   './app-online-entry.js',
   './app-toolbox.js',
+  './app-toolbox-mobile.js',
   './place-worker.js',
   './assets/logo.svg'
 ];
