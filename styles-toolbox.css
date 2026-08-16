@@ -1,0 +1,51 @@
+#ortenToolboxRoot{font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef7fb}
+#ortenToolboxRoot *{box-sizing:border-box}
+.toolbox-launcher{position:fixed;right:14px;bottom:14px;z-index:2147483000;width:54px;height:54px;border:1px solid rgba(104,246,255,.45);border-radius:18px;background:#071521;color:#fff;box-shadow:0 12px 40px rgba(0,0,0,.45);font-size:25px;cursor:pointer}
+.toolbox-launcher:hover{transform:translateY(-2px);border-color:#68f6ff}
+.toolbox-panel{position:fixed;z-index:2147483001;top:10px;right:10px;bottom:10px;width:min(390px,calc(100vw - 20px));display:none;overflow:auto;overscroll-behavior:contain;background:rgba(5,14,23,.98);border:1px solid rgba(104,246,255,.24);border-radius:22px;box-shadow:0 24px 80px rgba(0,0,0,.58);padding:14px}
+.toolbox-panel.open{display:block}
+.toolbox-head{position:sticky;top:-14px;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-14px -14px 12px;padding:14px;background:rgba(5,14,23,.98);border-bottom:1px solid rgba(255,255,255,.08)}
+.toolbox-head small{display:block;color:#6f94a8;font-size:9px;font-weight:850;letter-spacing:.11em}
+.toolbox-head strong{display:block;margin-top:2px;font-size:18px}
+.toolbox-head button{width:38px;height:38px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:#0d1d2a;color:#fff;font-size:24px}
+.toolbox-intro{padding:10px 12px;border-radius:14px;background:rgba(104,246,255,.055);border:1px solid rgba(104,246,255,.12)}
+.toolbox-intro span{display:inline-block;padding:4px 7px;border-radius:999px;background:rgba(104,246,255,.12);color:#8df7ff;font-size:10px;font-weight:850}
+.toolbox-intro p,.toolbox-export p{margin:8px 0 0;color:#a7bdc9;font-size:11px;line-height:1.45}
+.toolbox-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.toolbox-actions button,.toolbox-danger button,.toolbox-section-title button{min-height:38px;border:1px solid rgba(255,255,255,.11);border-radius:11px;background:#0d1d2a;color:#dce9ef;font-weight:750;font-size:11px}
+.toolbox-actions button.primary{background:rgba(104,246,255,.12);border-color:rgba(104,246,255,.36);color:#a8fbff}
+.toolbox-actions button.primary.active{background:#68f6ff;color:#06131d}
+.toolbox-empty{display:grid;gap:5px;padding:18px 12px;text-align:center;border:1px dashed rgba(255,255,255,.14);border-radius:14px;color:#8ea7b5}
+.toolbox-empty strong{color:#dce9ef;font-size:13px}
+.toolbox-empty span{font-size:11px;line-height:1.45}
+.toolbox-inspector{display:grid;gap:10px}
+.toolbox-section{padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.025)}
+.toolbox-section h3{margin:0 0 9px;color:#84f7ff;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.toolbox-section-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
+.toolbox-section-title strong{font-size:12px}
+.toolbox-section-title button{min-height:30px;padding:0 9px}
+.toolbox-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.toolbox-field{display:grid;gap:4px;margin:7px 0}
+.toolbox-field>span,.toolbox-check span{color:#91a9b7;font-size:9px;font-weight:800;letter-spacing:.045em;text-transform:uppercase}
+.toolbox-field input,.toolbox-field textarea,.toolbox-field select,.toolbox-export textarea{width:100%;min-height:35px;border:1px solid rgba(255,255,255,.11);border-radius:9px;background:#07131d;color:#f2f7fa;padding:8px;font:600 11px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;outline:none}
+.toolbox-field textarea,.toolbox-export textarea{resize:vertical}
+.toolbox-field input:focus,.toolbox-field textarea:focus,.toolbox-field select:focus,.toolbox-export textarea:focus{border-color:#68f6ff;box-shadow:0 0 0 2px rgba(104,246,255,.1)}
+.toolbox-field input[type=color]{padding:3px;min-height:36px}
+.toolbox-field.readonly input{color:#6f8c9e;background:#061019}
+.toolbox-check{display:flex;align-items:center;gap:8px;min-height:35px;margin-top:7px;padding:8px;border-radius:9px;background:#07131d;border:1px solid rgba(255,255,255,.09)}
+.toolbox-check input{accent-color:#68f6ff}
+.toolbox-export{margin-top:10px;padding:11px;border:1px solid rgba(255,255,255,.08);border-radius:14px;background:rgba(255,255,255,.025)}
+.toolbox-export summary{cursor:pointer;color:#dce9ef;font-size:11px;font-weight:800}
+.toolbox-danger{margin-top:10px}
+.toolbox-danger button{width:100%;border-color:rgba(255,117,117,.22);color:#ff9c9c;background:rgba(255,80,80,.05)}
+.toolbox-status{position:sticky;bottom:-14px;margin:10px -14px -14px;padding:10px 14px;background:#081722;border-top:1px solid rgba(255,255,255,.07);color:#8fa8b6;font-size:10px;line-height:1.4}
+.toolbox-status.error{color:#ff9f9f}
+.toolbox-hover{outline:3px solid #ffcf5a!important;outline-offset:3px!important;cursor:crosshair!important}
+.toolbox-selected{outline:3px solid #68f6ff!important;outline-offset:3px!important}
+body.orten-toolbox-picking,body.orten-toolbox-picking *{cursor:crosshair!important}
+#ortenToolboxRoot .hidden{display:none!important}
+@media(max-width:600px){
+  .toolbox-panel{top:6px;right:6px;bottom:6px;width:calc(100vw - 12px);border-radius:18px}
+  .toolbox-launcher{right:10px;bottom:10px}
+  .toolbox-grid{grid-template-columns:1fr 1fr}
+}
