@@ -6,12 +6,21 @@ import {fileURLToPath} from 'node:url';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const toolbox=readFileSync(join(root,'app-toolbox.js'),'utf8');
+const toolboxCss=readFileSync(join(root,'styles-toolbox.css'),'utf8');
 const loader=readFileSync(join(root,'app.js'),'utf8');
+const sw=readFileSync(join(root,'service-worker.js'),'utf8');
 
 test('toolbox is opt-in and does not load for ordinary players',()=>{
   assert.match(loader,/params\.get\('verktyg'\)==='1'/);
   assert.match(loader,/files\.push\('app-toolbox\.js'\)/);
   assert.match(toolbox,/params\.get\('verktyg'\) !== '1'/);
+});
+
+test('toolbox assets are available offline once the app shell is cached',()=>{
+  assert.match(sw,/\.\/app-toolbox\.js/);
+  assert.match(sw,/\.\/styles-toolbox\.css/);
+  assert.match(toolboxCss,/\.toolbox-panel/);
+  assert.match(toolboxCss,/\.toolbox-selected/);
 });
 
 test('toolbox supports persistent visual overrides and export',()=>{
