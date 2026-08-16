@@ -32,7 +32,7 @@ jobs:
         run: node scripts/validate-world-data.mjs
       - name: Kontrollera JavaScript-syntax
         run: |
-          for file in app.js app-core.js app-setup.js game-geometry.js highscore.js supabase-highscore.js app-map.js map-themes.js app-search.js app-ui.js app-highscore-ui.js app-online.js app-online-entry.js place-worker.js data.js service-worker.js scripts/build-world-data.mjs scripts/validate-world-data.mjs scripts/quality-gate.mjs tests/geometry.test.mjs tests/highscore.test.mjs tests/global-highscore.test.mjs; do
+          for file in app.js app-core.js app-setup.js game-geometry.js duel-routes.js highscore.js supabase-highscore.js app-map.js map-themes.js app-search.js app-ui.js app-highscore-ui.js app-online.js app-online-entry.js place-worker.js data.js service-worker.js scripts/build-world-data.mjs scripts/validate-world-data.mjs scripts/quality-gate.mjs tests/geometry.test.mjs tests/duel-routes.test.mjs tests/highscore.test.mjs tests/global-highscore.test.mjs; do
             node --check "$file"
           done
       - name: Kör spelmotorns tester
