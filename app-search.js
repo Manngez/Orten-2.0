@@ -77,14 +77,19 @@
 
   function commitPlace(place){
     if(game.finished||game.paused)return; if(isDuplicate(place))return toast(`${place.name} har redan använts enligt den valda dubblettregeln.`,'error',3900);
-    const playerIndex=game.currentIndex; const crossings=crossingsForNewPlace(place); const prev=game.route.at(-1); const stored={...place,playerIndex,ux:unwrapLon(place.lon,prev?.ux),moveNumber:game.totalMoves+1};
+    const playerIndex=game.currentIndex; const crossings=crossingsForNewPlace(place);
+    const ownPrev=game.settings.mode==='duel'?DUEL.playerLast(game.route,playerIndex):game.route.at(-1);
+    const playerMoveNumber=game.settings.mode==='duel'?DUEL.playerMoveCount(game.route,playerIndex)+1:null;
+    const stored={...place,playerIndex,ux:unwrapLon(place.lon,ownPrev?.ux),moveNumber:game.totalMoves+1,...(playerMoveNumber?{playerMoveNumber}:{})};
     game.route.push(stored);game.totalMoves++;game.roundMoves++;game.lastCrossings=crossings; if(crossings.length)game.totalCrossings++;
     els.placeInput.value='';setSearchState(`${D.flag(place.countryCode)} ${place.name} registrerad · ${placeSecondary(place)}`);tone(crossings.length?'cross':'move');renderMap();updateRecentChoices();
     if(crossings.length){showCrossBanner(crossings,stored);handleCrossing(playerIndex,crossings);}else{if(game.settings.mode!=='solo')game.currentIndex=nextActiveIndex(playerIndex);updateGameUI();resetTurnTimer();fitRoute(false)}
   }
 
   function showCrossBanner(crossings,place){
-    clearTimeout(crossBannerTimer);const first=crossings[0];const seg=game.route[first.crossedSegmentIndex+1];els.crossBannerText.textContent=`${place.name} skär sträckan mot ${seg?.name||'en tidigare ort'}${crossings.length>1?` · ${crossings.length} korsningar i samma drag`:''}`;els.crossBanner.classList.remove('hidden');
+    clearTimeout(crossBannerTimer);const first=crossings[0];const endIndex=first.crossedEndIndex??(first.crossedSegmentIndex+1);const seg=game.route[endIndex];
+    const prefix=game.settings.mode==='duel'?'Din egen linje: ':'';
+    els.crossBannerText.textContent=`${prefix}${place.name} skär sträckan mot ${seg?.name||'en tidigare ort'}${crossings.length>1?` · ${crossings.length} korsningar i samma drag`:''}`;els.crossBanner.classList.remove('hidden');
     crossBannerTimer=setTimeout(()=>els.crossBanner.classList.add('hidden'),5200);
     if(map&&first)withProgrammaticMap(()=>map.flyTo([first.lat,first.lon],Math.max(map.getZoom(),5),{duration:.6}));
   }
@@ -92,6 +97,11 @@
   function handleCrossing(playerIndex,crossings){
     const player=game.players[playerIndex];game.bestRound=Math.max(game.bestRound,game.roundMoves);
     if(game.settings.mode==='solo'){game.finished=true;updateGameUI();showFinalResult({kind:'solo',loser:player});return}
+    if(game.settings.mode==='duel'){
+      const limit=Math.max(1,Number(game.settings.strikeLimit)||1);player.strikes++;
+      if(player.strikes>=limit){const winner=game.players.find((p,i)=>i!==playerIndex&&p.active);game.finished=true;updateGameUI();showFinalResult({kind:'duel',loser:player,winner});return}
+      game.currentIndex=nextActiveIndex(playerIndex);updateGameUI();resetTurnTimer();toast(`${player.name} korsade sin egen linje (${player.strikes}/${limit}). Duellen fortsätter.`,'error',3900);return;
+    }
     if(game.settings.mode==='classic'){game.finished=true;updateGameUI();showFinalResult({kind:'loss',loser:player});return}
     if(game.settings.mode==='endurance'){
       player.strikes++; if(player.strikes>=game.settings.strikeLimit){game.finished=true;updateGameUI();showFinalResult({kind:'loss',loser:player});return}
@@ -103,7 +113,13 @@
     }
   }
 
-  function statCards(){return `<div class="result-stat"><strong>${game.totalMoves}</strong><span>DRAG TOTALT</span></div><div class="result-stat"><strong>${game.bestRound||game.roundMoves}</strong><span>BÄSTA RUTT</span></div><div class="result-stat"><strong>${game.totalCrossings}</strong><span>KORSNINGAR</span></div>`}
+  function statCards(){
+    if(game.settings?.mode==='duel'){
+      const a=DUEL.playerMoveCount(game.route,0),b=DUEL.playerMoveCount(game.route,1);
+      return `<div class="result-stat"><strong>${a}</strong><span>${esc(game.players[0]?.name||'SPELARE 1')} · ORTER</span></div><div class="result-stat"><strong>${b}</strong><span>${esc(game.players[1]?.name||'SPELARE 2')} · ORTER</span></div><div class="result-stat"><strong>${game.totalCrossings}</strong><span>KORSNINGSDRAG</span></div>`;
+    }
+    return `<div class="result-stat"><strong>${game.totalMoves}</strong><span>DRAG TOTALT</span></div><div class="result-stat"><strong>${game.bestRound||game.roundMoves}</strong><span>BÄSTA RUTT</span></div><div class="result-stat"><strong>${game.totalCrossings}</strong><span>KORSNINGAR</span></div>`;
+  }
   function recordSoloHighscore(){
     if(!SCORE||game.settings?.mode!=='solo')return null;
     return SCORE.record({settings:game.settings,playerName:game.players[0]?.name,score:game.route.length,completedAt:Date.now()});
@@ -138,6 +154,10 @@
   function showFinalResult({kind,loser,winner}){
     els.continueButton.classList.add('hidden');els.playAgainButton.classList.remove('hidden');els.changeSettingsButton.classList.remove('hidden');
     if(kind==='winner'){els.resultIcon.textContent='🏆';els.resultTitle.textContent=`${winner?.name||'Vinnaren'} vinner!`;els.resultText.textContent=`Alla andra spelare har slagits ut efter ${game.round} rundor.`;}
+    else if(kind==='duel'){
+      const loserIndex=game.players.indexOf(loser),winnerIndex=game.players.indexOf(winner);const loserMoves=DUEL.playerMoveCount(game.route,loserIndex),winnerMoves=DUEL.playerMoveCount(game.route,winnerIndex);
+      els.resultIcon.textContent='⚔️';els.resultTitle.textContent=`${winner?.name||'Vinnaren'} vinner duellen!`;els.resultText.textContent=`${loser?.name||'Motståndaren'} korsade sin egen linje efter ${loserMoves} orter. ${winner?.name||'Vinnaren'} hade ${winnerMoves} orter på sin linje.`;
+    }
     else if(kind==='solo'){els.resultIcon.textContent='🧭';els.resultTitle.textContent='Rutten korsades';els.resultText.textContent=`Din rutt nådde ${game.route.length} orter innan en ny sträcka skar en tidigare linje.`;}
     else{els.resultIcon.textContent='⚡';els.resultTitle.textContent=`${loser?.name||'Spelaren'} korsade linjen`;els.resultText.textContent=`Rutten höll i ${game.roundMoves} orter. Den korsade sträckan är markerad på kartan.`;}
     const highscore=kind==='solo'?recordSoloHighscore():null;

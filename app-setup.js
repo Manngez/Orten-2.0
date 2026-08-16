@@ -3,7 +3,7 @@
   function updateSummary(){
     const timer=settings.timer?`${settings.timer} sek`:'Ingen';
     const playerText=settings.mode==='solo'?'1 spelare':`${settings.playerCount} spelare`;
-    const extra=settings.mode==='endurance'?`${settings.strikeLimit} korsningar`:settings.mode==='elimination'?'Sista kvar vinner':'1 korsning';
+    const extra=settings.mode==='endurance'?`${settings.strikeLimit} korsningar`:settings.mode==='duel'?`${settings.strikeLimit} egen${settings.strikeLimit===1?'':'a'} korsning${settings.strikeLimit===1?'':'ar'} innan förlust`:settings.mode==='elimination'?'Sista kvar vinner':'1 korsning';
     els.summaryRows.innerHTML=[
       ['Spelläge',`${modeIcon()} ${modeLabel()}`],['Område',scopeLabel()],['Spelare',playerText],['Regel',extra],['Turtid',timer],['Karta',themeLabel()]
     ].map(([a,b])=>`<div class="summary-row"><span>${esc(a)}</span><strong>${esc(b)}</strong></div>`).join('');
@@ -78,10 +78,12 @@
   }
 
   function bindSetupEvents(){
-    ensureSetupWizard();
+    ensureDuelModeControls();ensureSetupWizard();
     els.modeGrid.addEventListener('click',e=>{
       const b=e.target.closest('[data-mode]');if(!b)return;
-      settings.mode=b.dataset.mode;settings.preset=null;normalizePlayerCount();updateSetupUI(false);
+      const previous=settings.mode;settings.mode=b.dataset.mode;settings.preset=null;
+      if(settings.mode==='duel'&&previous!=='duel')settings.strikeLimit=1;
+      normalizePlayerCount();updateSetupUI(false);
       setTimeout(()=>showSetupStep(2),120);
     });
     els.scopeTabs.addEventListener('click',e=>{
@@ -118,7 +120,9 @@
 
   function deepSettings(){ return JSON.parse(JSON.stringify(settings)); }
   function startGame(){
-    game.settings=deepSettings(); game.active=true; game.paused=false; game.finished=false; game.currentIndex=0; game.route=[]; game.lastCrossings=[]; game.totalCrossings=0; game.totalMoves=0; game.roundMoves=0; game.bestRound=0; game.round=1; game.pendingNextRound=false; game.followEnabled=!!game.settings.autoFollow;
+    game.settings=deepSettings();
+    if(game.settings.mode==='duel'){game.settings.playerCount=2;game.settings.strikeLimit=Math.max(1,Number(game.settings.strikeLimit)||1)}
+    game.active=true; game.paused=false; game.finished=false; game.currentIndex=0; game.route=[]; game.lastCrossings=[]; game.totalCrossings=0; game.totalMoves=0; game.roundMoves=0; game.bestRound=0; game.round=1; game.pendingNextRound=false; game.followEnabled=!!game.settings.autoFollow;
     game.players=Array.from({length:game.settings.playerCount},(_,i)=>({name:(game.settings.playerNames[i]||`Spelare ${i+1}`).trim()||`Spelare ${i+1}`,strikes:0,active:true,color:PLAYER_COLORS[i]}));
     game.initialView=initialViewForSettings(game.settings);
     showScreen('game'); closeAllGameModals(); initMap(); resetMapToInitial(); tone('start'); updateGameUI(); resetTurnTimer(); warmPlaceIndex(); setTimeout(()=>els.placeInput.focus(),120);

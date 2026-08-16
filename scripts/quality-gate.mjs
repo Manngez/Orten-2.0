@@ -12,8 +12,8 @@ const requiredFiles = [
   'index.html', 'styles.css', 'styles-base.css', 'styles-game.css', 'styles-responsive.css',
   'styles-atlas.css', 'styles-map-themes.css', 'styles-highscore.css', 'manifest.webmanifest', 'data.js', 'app.js',
   'app-core.js', 'app-setup.js', 'app-map.js', 'map-themes.js', 'app-search.js', 'app-ui.js',
-  'app-highscore-ui.js', 'app-online.js', 'app-online-entry.js', 'place-worker.js', 'game-geometry.js', 'highscore.js',
-  'supabase-highscore.js', 'service-worker.js', 'tests/geometry.test.mjs', 'tests/highscore.test.mjs',
+  'app-highscore-ui.js', 'app-online.js', 'app-online-entry.js', 'place-worker.js', 'game-geometry.js', 'duel-routes.js', 'highscore.js',
+  'supabase-highscore.js', 'service-worker.js', 'tests/geometry.test.mjs', 'tests/duel-routes.test.mjs', 'tests/highscore.test.mjs',
   'tests/global-highscore.test.mjs', 'assets/logo.svg', 'data/world-places.json', 'data/world-meta.json'
 ];
 
@@ -22,6 +22,10 @@ for (const file of requiredFiles) ok(fileExists(file), `Saknad kritisk fil: ${fi
 const html = read('index.html');
 const app = read('app.js');
 const core = read('app-core.js');
+const setup = read('app-setup.js');
+const map = read('app-map.js');
+const ui = read('app-ui.js');
+const duel = read('duel-routes.js');
 const mapThemes = read('map-themes.js');
 const css = read('styles.css');
 const sw = read('service-worker.js');
@@ -47,10 +51,12 @@ for (const id of expectedIds) ok(htmlIds.includes(id), `app-core.js förväntar 
 
 const loaderBlock = app.match(/const\s+files\s*=\s*\[([\s\S]*?)\]/)?.[1] || '';
 const loaderFiles = [...loaderBlock.matchAll(/'([^']+\.js)'/g)].map(match => match[1]);
-ok(loaderFiles.length >= 11, 'app.js kunde inte verifiera modulordningen.');
+ok(loaderFiles.length >= 12, 'app.js kunde inte verifiera modulordningen.');
 for (const file of loaderFiles) ok(fileExists(file), `app.js försöker ladda en fil som saknas: ${file}`);
 ok(loaderFiles.includes('game-geometry.js'), 'Den testade geometri-motorn måste laddas av app.js.');
-ok(loaderFiles.indexOf('game-geometry.js') < loaderFiles.indexOf('app-map.js'), 'game-geometry.js måste laddas före app-map.js.');
+ok(loaderFiles.includes('duel-routes.js'), 'Duellmotorn måste laddas av app.js.');
+ok(loaderFiles.indexOf('game-geometry.js') < loaderFiles.indexOf('duel-routes.js'), 'game-geometry.js måste laddas före duel-routes.js.');
+ok(loaderFiles.indexOf('duel-routes.js') < loaderFiles.indexOf('app-map.js'), 'duel-routes.js måste laddas före app-map.js.');
 ok(loaderFiles.includes('highscore.js'), 'Highscore-motorn måste laddas av app.js.');
 ok(loaderFiles.indexOf('highscore.js') < loaderFiles.indexOf('supabase-highscore.js'), 'Lokal highscore måste laddas före Supabase-adaptern.');
 ok(loaderFiles.indexOf('supabase-highscore.js') < loaderFiles.indexOf('app-search.js'), 'Supabase-adaptern måste laddas före app-search.js.');
@@ -79,10 +85,21 @@ for (const url of tileUrls) ok(url.includes('_nolabels'), `Karttema får inte vi
 ok(/serviceWorker\.register/.test(app), 'Service Worker måste registreras från app.js.');
 ok(/world-places\.json/.test(sw), 'Service Worker måste uttryckligen hantera world-places.json.');
 ok(/NETWORK_ONLY/i.test(sw), 'Det stora ortregistret måste vara network-only för att undvika gammal världsdata i cache.');
+ok(sw.includes("'./duel-routes.js'"), 'Service Worker måste cacha duellmotorn.');
 ok(sw.includes("'./highscore.js'"), 'Service Worker måste cacha highscore.js.');
 ok(sw.includes("'./supabase-highscore.js'"), 'Service Worker måste cacha Supabase-adaptern.');
 ok(sw.includes("'./app-highscore-ui.js'"), 'Service Worker måste cacha highscore-UI.');
 ok(sw.includes("'./styles-highscore.css'"), 'Service Worker måste cacha highscore-stilar.');
+
+ok(/ensureDuelModeControls/.test(core) && /dataset\.mode='duel'/.test(core), 'Duell måste finnas som ett tydligt spelläge på startsidan.');
+ok(/settings\.mode==='duel'\) settings\.playerCount=2/.test(core), 'Duell måste låsa spelarantalet till exakt två.');
+ok(/duel:'Duell'/.test(core) && /duel:'⚔️'/.test(core), 'Duell måste ha namn och ikon i UI.');
+ok(/settings\.mode==='duel'&&previous!=='duel'/.test(setup) && /settings\.strikeLimit=1/.test(setup), 'Duell ska som standard avgöras vid första egna korsningen.');
+ok(/candidateCrossings/.test(duel) && /indexedPlayerRoute/.test(duel) && /segments/.test(duel), 'Duellmotorn måste hålla spelarnas rutter separata.');
+ok(/DUEL\.candidateCrossings/.test(map), 'Kartan måste kontrollera korsning mot den aktiva spelarens egen linje i Duell.');
+ok(/game\.settings\?\.mode==='duel'\?game\.route\.filter/.test(map), 'Dubblettkontrollen i Duell måste gälla den egna rutten.');
+ok(/kind:'duel'/.test(search) && /korsade sin egen linje/.test(search), 'Duell måste avslutas med en tydlig vinnare när den egna linjen korsas.');
+ok(/motståndarens linje får korsas/.test(ui), 'Duell-UI måste förklara att motståndarens linje får korsas.');
 
 ok(/settings\.mode!=='solo'/.test(highscore), 'Highscore-motorn måste blockera icke-Solo-resultat.');
 ok(/STORAGE_LIMIT=100/.test(highscore), 'Highscore-motorn måste behålla personbästan utanför synlig topp 10.');
@@ -114,4 +131,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Quality gate OK: ${requiredFiles.length} kritiska filer, ${expectedIds.length} DOM-kontrakt, ${loaderFiles.length} klientmoduler, lokal + global highscore, synlig lokal reserv, PWA, kartteman och säkerhetsregler verifierade.`);
+console.log(`Quality gate OK: ${requiredFiles.length} kritiska filer, ${expectedIds.length} DOM-kontrakt, ${loaderFiles.length} klientmoduler, Duell med separata linjer, lokal + global highscore, PWA, kartteman och säkerhetsregler verifierade.`);
