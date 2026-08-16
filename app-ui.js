@@ -1,12 +1,23 @@
   function updateScoreboard(){
     els.scoreboard.innerHTML=game.players.map((p,i)=>{
-      const meta=game.settings.mode==='endurance'?`${p.strikes}/${game.settings.strikeLimit} korsningar`:(game.settings.mode==='elimination'?(p.active?'kvar':'utslagen'):'');
+      let meta='';
+      if(game.settings.mode==='endurance')meta=`${p.strikes}/${game.settings.strikeLimit} korsningar`;
+      else if(game.settings.mode==='elimination')meta=p.active?'kvar':'utslagen';
+      else if(game.settings.mode==='duel'){
+        const moves=DUEL.playerMoveCount(game.route,i);const limit=Math.max(1,Number(game.settings.strikeLimit)||1);
+        meta=limit>1?`${moves} orter · ${p.strikes}/${limit} egna korsningar`:`${moves} orter · ${p.strikes?'korsad':'hel linje'}`;
+      }
       return `<div class="score-row${i===game.currentIndex&&!game.finished?' current':''}${!p.active?' eliminated':''}"><i class="score-dot" style="background:${p.color};box-shadow:0 0 10px ${p.color}"></i><span>${esc(p.name)}</span><span class="score-meta">${esc(meta)}</span></div>`;
     }).join('');
   }
 
   function updateRouteList(){
-    els.routeCount.textContent=String(game.route.length);els.routeList.innerHTML=game.route.map((p,i)=>`<li data-index="${i}"><b>${String(i+1).padStart(2,'0')}</b><span>${D.flag(p.countryCode)} ${esc(p.name)}<small>${esc(placeSecondary(p))}</small></span></li>`).join('');
+    els.routeCount.textContent=String(game.route.length);
+    els.routeList.innerHTML=game.route.map((p,i)=>{
+      const number=game.settings?.mode==='duel'?(p.playerMoveNumber||DUEL.playerMoveCount(game.route.slice(0,i+1),p.playerIndex)):i+1;
+      const player=game.players[p.playerIndex];const owner=game.settings?.mode==='duel'?`<small style="color:${player?.color||PLAYER_COLORS[0]}">${esc(player?.name||'Spelare')} · ${esc(placeSecondary(p))}</small>`:`<small>${esc(placeSecondary(p))}</small>`;
+      return `<li data-index="${i}"><b style="color:${player?.color||''}">${String(number).padStart(2,'0')}</b><span>${D.flag(p.countryCode)} ${esc(p.name)}${owner}</span></li>`;
+    }).join('');
     requestAnimationFrame(()=>{els.routeList.scrollTop=els.routeList.scrollHeight});
   }
 
@@ -14,7 +25,11 @@
     if(!game.settings)return; const p=game.players[game.currentIndex]||game.players[0];
     els.scopeBadge.textContent=`🌍 ${scopeLabel(game.settings)}`;els.modeBadge.textContent=`${modeIcon(game.settings.mode)} ${modeLabel(game.settings.mode)}`;
     els.currentPlayerName.textContent=p?.name||'Spelare';els.turnDot.style.background=p?.color||PLAYER_COLORS[0];els.turnDot.style.boxShadow=`0 0 15px ${p?.color||PLAYER_COLORS[0]}`;
-    els.turnSubtext.textContent=game.finished?'Spelet är avslutat':game.paused?'Pausat':(game.settings.mode==='solo'?'Bygg vidare på rutten':`Runda ${game.round} · välj nästa ort`);
+    if(game.finished)els.turnSubtext.textContent='Spelet är avslutat';
+    else if(game.paused)els.turnSubtext.textContent='Pausat';
+    else if(game.settings.mode==='solo')els.turnSubtext.textContent='Bygg vidare på rutten';
+    else if(game.settings.mode==='duel')els.turnSubtext.textContent=`Din linje: ${DUEL.playerMoveCount(game.route,game.currentIndex)} orter · motståndarens linje får korsas`;
+    else els.turnSubtext.textContent=`Runda ${game.round} · välj nästa ort`;
     els.inputScopeText.textContent=`Sökningen gäller ${scopeLabel(game.settings).toLowerCase()} · ${placeTypeLabel(game.settings.placeType).toLowerCase()}.`;
     els.placeInput.disabled=game.finished||game.paused||game.pendingNextRound;els.playButton.disabled=els.placeInput.disabled;
     els.followButton.classList.toggle('active',game.followEnabled);els.followButton.title=game.followEnabled?'Smart kartföljning på':'Smart kartföljning av';
@@ -47,6 +62,10 @@
     const mode=game.settings?modeLabel(game.settings.mode):'Klassisk';
     let headline=`Vi klarade ${game.totalMoves} drag i Orten 2.0.`;
     if(game.settings?.mode==='solo') headline=`Jag nådde ${game.route.length} orter i Orten 2.0 innan rutten korsades.`;
+    else if(game.settings?.mode==='duel'&&game.finished){
+      const loser=game.players.find(p=>p.strikes>=Math.max(1,Number(game.settings.strikeLimit)||1));const winner=game.players.find(p=>p!==loser);
+      if(winner)headline=`${winner.name} vann en Duell med två separata linjer i Orten 2.0.`;
+    }
     else if(game.settings?.mode==='elimination'&&game.finished){
       const winner=game.players.find(p=>p.active);
       if(winner) headline=`${winner.name} vann Orten 2.0 efter ${game.round} rundor.`;
