@@ -8,16 +8,17 @@
   filter: none !important;
 }
 
-/* NIGHT: dark, but readable rather than crushed to black. */
+/* NIGHT: dark, but clearly readable. */
 #gameScreen .map.theme-night {
-  background: #213b4b !important;
+  background: #29495b !important;
 }
 #gameScreen .map.theme-night .leaflet-tile {
-  filter: brightness(1.34) saturate(1.08) contrast(1.02) !important;
+  filter: brightness(1.48) saturate(1.10) contrast(1.00) !important;
   opacity: 1 !important;
 }
 #gameScreen.theme-night-ui .map-vignette {
-  box-shadow: inset 0 0 62px rgba(2, 8, 14, .22) !important;
+  box-shadow: inset 0 0 54px rgba(2, 8, 14, .14) !important;
+  background: rgba(45, 80, 98, .018) !important;
 }
 
 /* ATLAS: classic colourful school-atlas look, but kept readable on mobile. */
