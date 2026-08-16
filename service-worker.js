@@ -16,6 +16,7 @@ const PRECACHE = [
   './styles-atlas.css',
   './styles-map-themes.css',
   './styles-highscore.css',
+  './styles-toolbox.css',
   './data.js',
   './app.js',
   './app-core.js',
@@ -31,6 +32,7 @@ const PRECACHE = [
   './app-highscore-ui.js',
   './app-online.js',
   './app-online-entry.js',
+  './app-toolbox.js',
   './place-worker.js',
   './assets/logo.svg'
 ];
