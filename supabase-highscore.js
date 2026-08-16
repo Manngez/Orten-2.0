@@ -47,6 +47,10 @@
     return !Number.isFinite(previous)||next>previous;
   }
 
+  function isEligibleSubmission(settings={},source=''){
+    return settings?.mode==='solo'&&source==='solo-result';
+  }
+
   function loadSDK(){
     if(root?.supabase?.createClient)return Promise.resolve(root.supabase);
     if(sdkPromise)return sdkPromise;
@@ -121,8 +125,8 @@
     return Number(result.count||0)+1;
   }
 
-  async function record({settings,playerName,score}={}){
-    if(!settings||settings.mode!=='solo')return {eligible:false,online:true,saved:false,personalBest:false,rank:null,entries:[]};
+  async function record({settings,playerName,score,source}={}){
+    if(!isEligibleSubmission(settings,source))return {eligible:false,online:true,saved:false,personalBest:false,rank:null,entries:[]};
     const numeric=Math.floor(Number(score));
     if(!Number.isFinite(numeric)||numeric<1)return {eligible:true,online:true,saved:false,personalBest:false,rank:null,entries:(await list(settings)).entries};
 
@@ -176,5 +180,5 @@
     return {online:true,count:board.entries.length};
   }
 
-  return Object.freeze({PROJECT_URL,SDK_URL,TABLE,boardKey,normalizeRows,isPersonalBest,list,record,ping});
+  return Object.freeze({PROJECT_URL,SDK_URL,TABLE,boardKey,normalizeRows,isPersonalBest,isEligibleSubmission,list,record,ping});
 });
