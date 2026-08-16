@@ -26,6 +26,7 @@ const PRECACHE = [
   './map-themes.js',
   './app-search.js',
   './app-ui.js',
+  './app-highscore-ui.js',
   './app-online.js',
   './app-online-entry.js',
   './place-worker.js',
