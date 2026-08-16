@@ -103,11 +103,14 @@ ok(/motståndarens linje får korsas/.test(ui), 'Duell-UI måste förklara att m
 
 ok(/settings\.mode!=='solo'/.test(highscore), 'Highscore-motorn måste blockera icke-Solo-resultat.');
 ok(/STORAGE_LIMIT=100/.test(highscore), 'Highscore-motorn måste behålla personbästan utanför synlig topp 10.');
-ok(/highscoreButton/.test(highscoreUI) && /resultHighscoreButton/.test(highscoreUI), 'Highscore måste gå att öppna både före och efter spel.');
+ok(/highscoreButton/.test(highscoreUI) && /resultHighscoreButton/.test(highscoreUI), 'Highscore måste gå att öppna både före och efter Solo-spel.');
 ok(/GLOBAL TOPP 10/.test(highscoreUI) && /LOKAL TOPP 10/.test(highscoreUI), 'Highscore-UI måste ha global lista med lokal fallback.');
 ok(/highscoreMine/.test(highscoreUI) && /highscoreLocalBoard/.test(highscoreUI), 'Spelarens lokala rekord måste alltid vara synligt även när global lista är tom.');
-ok(/highscoreRetry/.test(highscoreUI) && /GLOBAL\.record/.test(highscoreUI), 'Highscore-vyn måste kunna återförsöka global synkning från lokalt personbästa.');
+ok(/highscoreRetry/.test(highscoreUI) && /GLOBAL\.record/.test(highscoreUI), 'Highscore-vyn måste kunna återförsöka en misslyckad Solo-synkning.');
 ok(/friendlyError/.test(highscoreUI), 'Highscore-vyn måste ge begriplig synkdiagnostik.');
+ok(/const remote=await GLOBAL\.list\(board\)/.test(highscoreUI), 'Att öppna highscore-vyn får bara läsa den globala listan, aldrig automatiskt skriva ett resultat.');
+ok(/isFinishedSoloGame/.test(highscoreUI) && /source:'solo-result'/.test(highscoreUI), 'Manuell highscore-synkning måste kräva ett faktiskt avslutat Solo-spel.');
+ok(/resultHighscoreButton/.test(search) && /kind!=='solo'/.test(search), 'Resultatknappen för highscore måste döljas i Duell och andra icke-Solo-lägen.');
 
 ok(globalHighscore.includes("TABLE='orten_highscores'"), 'Supabase-adaptern måste använda den avsedda highscore-tabellen.');
 ok(globalHighscore.includes('signInAnonymously'), 'Global highscore måste skapa anonym spelaridentitet före skrivning.');
@@ -115,7 +118,8 @@ ok(globalHighscore.includes("onConflict:'user_id,board_key'"), 'Global highscore
 ok(globalHighscore.includes('@supabase/supabase-js@2.111.0'), 'Supabase SDK måste vara versionslåst.');
 ok(/PUBLISHABLE_KEY='sb_publishable_/.test(globalHighscore), 'Klienten måste använda en publishable Supabase-nyckel.');
 ok(!/sb_secret_|service_role/i.test(globalHighscore), 'Hemlig Supabase-nyckel får aldrig finnas i klientkoden.');
-ok(/OrtenGlobalHighscore/.test(search) && /GLOBAL_SCORE\.record/.test(search), 'Solo-resultat måste synkas till global highscore.');
+ok(/isEligibleSubmission/.test(globalHighscore) && /source==='solo-result'/.test(globalHighscore), 'Supabase-skrivning måste kräva uttrycklig Solo-resultatkälla.');
+ok(/OrtenGlobalHighscore/.test(search) && /GLOBAL_SCORE\.record/.test(search) && /source:'solo-result'/.test(search), 'Endast avslutade Solo-resultat får skickas till global highscore.');
 ok(/GLOBAL SYNK MISSLYCKADES/.test(search), 'Global highscore måste falla tillbaka utan att förlora lokalt rekord.');
 
 const jsFiles = ['app.js', ...loaderFiles, 'place-worker.js', 'data.js', 'service-worker.js'];
@@ -131,4 +135,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Quality gate OK: ${requiredFiles.length} kritiska filer, ${expectedIds.length} DOM-kontrakt, ${loaderFiles.length} klientmoduler, Duell med separata linjer, lokal + global highscore, PWA, kartteman och säkerhetsregler verifierade.`);
+console.log(`Quality gate OK: ${requiredFiles.length} kritiska filer, ${expectedIds.length} DOM-kontrakt, ${loaderFiles.length} klientmoduler, Duell med separata linjer, Solo-only highscore, PWA, kartteman och säkerhetsregler verifierade.`);

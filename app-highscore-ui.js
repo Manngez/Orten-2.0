@@ -10,8 +10,13 @@
     return {...settings,mode:'solo',playerCount:1,timer:0};
   }
 
+  function isFinishedSoloGame(){
+    return !!(game?.finished&&game?.settings?.mode==='solo');
+  }
+
   function currentPlayerName(){
-    return game?.players?.[0]?.name || settings?.playerNames?.[0] || 'Spelare 1';
+    if(isFinishedSoloGame())return game?.players?.[0]?.name||'Spelare 1';
+    return settings?.playerNames?.[0]||'Spelare 1';
   }
 
   function ruleText(board){
@@ -67,24 +72,19 @@
       return;
     }
 
-    retry.classList.toggle('hidden',!best);
+    retry.classList.toggle('hidden',!(best&&isFinishedSoloGame()));
     try{
-      const remote=best
-        ? await GLOBAL.record({settings:board,playerName:best.name,score:best.score})
-        : await GLOBAL.list(board);
+      // Highscore-vyn är strikt läsande. Den får aldrig skapa ett resultat.
+      const remote=await GLOBAL.list(board);
       if(token!==renderToken)return;
       kicker.textContent='GLOBAL TOPP 10';
       list.innerHTML=rowsMarkup(remote.entries||[],'global');
-      if(best){
-        note.textContent=remote.rank
-          ? `Ditt lokala personbästa är synkat. Global placering: #${remote.rank}.`
-          : 'Ditt lokala personbästa är synkat med Supabase.';
-      }else{
-        note.textContent='Gemensam topplista via Supabase.';
-      }
+      note.textContent=best
+        ? 'Ditt lokala Solo-rekord visas ovan. Den globala listan hämtas från Supabase.'
+        : 'Gemensam topplista via Supabase.';
       note.classList.remove('highscore-error-note');
     }catch(err){
-      console.warn('Global highscore kunde inte hämtas eller synkas.',err);
+      console.warn('Global highscore kunde inte hämtas.',err);
       if(token!==renderToken)return;
       kicker.textContent='GLOBAL SYNK EJ KLAR';
       list.innerHTML='<div class="highscore-empty"><strong>Den globala topplistan kunde inte laddas.</strong><br>Ditt lokala rekord visas fortfarande nedan.</div>';
@@ -108,9 +108,9 @@
     title.textContent=`Solo · ${scopeLabel(board)}`;
     sub.textContent=ruleText(board);
     kicker.textContent=GLOBAL?'GLOBAL TOPP 10':'LOKAL TOPP 10';
-    note.textContent=GLOBAL?'Synkar ditt rekord och hämtar den gemensamma topplistan…':'Rekorden sparas på den här enheten.';
+    note.textContent=GLOBAL?'Hämtar den gemensamma Solo-topplistan…':'Rekorden sparas på den här enheten.';
     note.classList.remove('highscore-error-note');
-    list.innerHTML='<div class="highscore-loading"><span></span>Synkar highscore…</div>';
+    list.innerHTML='<div class="highscore-loading"><span></span>Hämtar highscore…</div>';
     localList.innerHTML=rowsMarkup(localRows,'local');
     const best=renderMine(board);
 
@@ -123,9 +123,24 @@
 
   async function retrySync(){
     const button=$('highscoreRetry');
+    if(!isFinishedSoloGame()){
+      button?.classList.add('hidden');
+      return;
+    }
+    const board={...game.settings};
+    const player=game.players?.[0]?.name||'Spelare 1';
+    const best=HS?.best(board,player)||null;
+    if(!best||!GLOBAL)return;
     if(button){button.disabled=true;button.textContent='Synkar…'}
-    try{await renderHighscore()}
-    finally{if(button){button.disabled=false;button.textContent='↻ Försök synka igen'}}
+    try{
+      await GLOBAL.record({settings:board,playerName:best.name,score:best.score,source:'solo-result'});
+      await renderHighscore();
+    }catch(err){
+      const note=$('highscoreNote');
+      if(note){note.textContent=friendlyError(err);note.classList.add('highscore-error-note')}
+    }finally{
+      if(button){button.disabled=false;button.textContent='↻ Försök synka igen'}
+    }
   }
 
   function openHighscore(){
@@ -147,7 +162,7 @@
     const resultActions=document.querySelector('#resultModal .result-actions');
     if(resultActions){
       const button=document.createElement('button');
-      button.id='resultHighscoreButton';button.type='button';button.className='ghost-button';button.textContent='🏆 Highscore';
+      button.id='resultHighscoreButton';button.type='button';button.className='ghost-button hidden';button.textContent='🏆 Highscore';
       button.addEventListener('click',openHighscore);
       resultActions.insertBefore(button,resultActions.firstChild);
     }
