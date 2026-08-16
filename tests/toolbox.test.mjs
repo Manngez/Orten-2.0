@@ -6,6 +6,7 @@ import {fileURLToPath} from 'node:url';
 
 const root=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const toolbox=readFileSync(join(root,'app-toolbox.js'),'utf8');
+const selectionGuard=readFileSync(join(root,'app-toolbox-selection-guard.js'),'utf8');
 const mobileToolbox=readFileSync(join(root,'app-toolbox-mobile.js'),'utf8');
 const toolboxCss=readFileSync(join(root,'styles-toolbox.css'),'utf8');
 const loader=readFileSync(join(root,'app.js'),'utf8');
@@ -13,13 +14,15 @@ const sw=readFileSync(join(root,'service-worker.js'),'utf8');
 
 test('toolbox is opt-in and does not load for ordinary players',()=>{
   assert.match(loader,/params\.get\('verktyg'\)==='1'/);
-  assert.match(loader,/files\.push\('app-toolbox\.js','app-toolbox-mobile\.js'\)/);
+  assert.match(loader,/files\.push\('app-toolbox\.js','app-toolbox-selection-guard\.js','app-toolbox-mobile\.js'\)/);
   assert.match(toolbox,/params\.get\('verktyg'\) !== '1'/);
+  assert.match(selectionGuard,/params\.get\('verktyg'\) !== '1'/);
   assert.match(mobileToolbox,/params\.get\('verktyg'\) !== '1'/);
 });
 
 test('toolbox assets are available offline once the app shell is cached',()=>{
   assert.match(sw,/\.\/app-toolbox\.js/);
+  assert.match(sw,/\.\/app-toolbox-selection-guard\.js/);
   assert.match(sw,/\.\/app-toolbox-mobile\.js/);
   assert.match(sw,/\.\/styles-toolbox\.css/);
   assert.match(toolboxCss,/\.toolbox-panel/);
@@ -43,6 +46,15 @@ test('toolbox can edit content, layout and dynamically rendered elements',()=>{
   assert.match(toolbox,/toolboxCss/);
   assert.match(toolbox,/new MutationObserver/);
   assert.match(toolbox,/selectorFor/);
+});
+
+test('picking a button blocks its real pointer activation before selecting it',()=>{
+  assert.match(selectionGuard,/addEventListener\('pointerdown'/);
+  assert.match(selectionGuard,/addEventListener\('pointerup'/);
+  assert.match(selectionGuard,/event\.preventDefault\(\)/);
+  assert.match(selectionGuard,/event\.stopImmediatePropagation\(\)/);
+  assert.match(selectionGuard,/dispatchEvent\(synthetic\)/);
+  assert.match(selectionGuard,/suppressUntil = performance\.now\(\) \+ 900/);
 });
 
 test('mobile toolbox behaves like a bottom sheet and clears the screen while picking',()=>{
