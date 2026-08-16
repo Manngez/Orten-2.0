@@ -10,6 +10,10 @@
     return {...settings,mode:'solo',playerCount:1,timer:0};
   }
 
+  function currentPlayerName(){
+    return game?.players?.[0]?.name || settings?.playerNames?.[0] || 'Spelare 1';
+  }
+
   function ruleText(board){
     return `${placeTypeLabel(board.placeType)} · ${board.duplicatePolicy==='exact'?'unik faktisk plats':board.duplicatePolicy==='nameCountry'?'namn + land':'återanvändning tillåten'}`;
   }
@@ -27,6 +31,68 @@
     }).join('');
   }
 
+  function friendlyError(err){
+    const raw=String(err?.message||err||'').toLowerCase();
+    if(raw.includes('anonymous')&&(raw.includes('disabled')||raw.includes('not enabled')))return 'Anonym spelaridentitet är inte aktiverad i Supabase.';
+    if(raw.includes('row-level')||raw.includes('row level')||raw.includes('permission')||raw.includes('policy'))return 'Supabase säkerhetsregler blockerar sparandet.';
+    if(raw.includes('relation')||raw.includes('does not exist')||raw.includes('not found'))return 'Highscore-tabellen kunde inte hittas i Supabase.';
+    if(raw.includes('fetch')||raw.includes('network')||raw.includes('load'))return 'Kunde inte nå Supabase just nu.';
+    return 'Global synk misslyckades. Ditt lokala rekord är fortfarande sparat.';
+  }
+
+  function renderMine(board){
+    const mine=$('highscoreMine');
+    if(!mine)return null;
+    const player=currentPlayerName();
+    const best=HS?.best(board,player)||null;
+    if(!best){
+      mine.innerHTML='<div class="highscore-mine-empty"><span>DITT REKORD</span><strong>Inget Solo-rekord sparat ännu</strong></div>';
+      return null;
+    }
+    mine.innerHTML=`<div class="highscore-mine-card"><div><span>DITT REKORD PÅ DEN HÄR ENHETEN</span><strong>${safe(best.name)}</strong></div><div class="highscore-mine-score">${best.score}<small>ORTER</small></div></div>`;
+    return best;
+  }
+
+  async function loadGlobal(board,best,token){
+    const list=$('highscoreBoard');
+    const kicker=$('highscoreKicker');
+    const note=$('highscoreNote');
+    const retry=$('highscoreRetry');
+    if(!list||!kicker||!note||!retry)return;
+
+    if(!GLOBAL){
+      kicker.textContent='LOKAL TOPP 10';
+      note.textContent='Den globala tjänsten är inte laddad. Ditt rekord finns kvar på enheten.';
+      retry.classList.add('hidden');
+      return;
+    }
+
+    retry.classList.toggle('hidden',!best);
+    try{
+      const remote=best
+        ? await GLOBAL.record({settings:board,playerName:best.name,score:best.score})
+        : await GLOBAL.list(board);
+      if(token!==renderToken)return;
+      kicker.textContent='GLOBAL TOPP 10';
+      list.innerHTML=rowsMarkup(remote.entries||[],'global');
+      if(best){
+        note.textContent=remote.rank
+          ? `Ditt lokala personbästa är synkat. Global placering: #${remote.rank}.`
+          : 'Ditt lokala personbästa är synkat med Supabase.';
+      }else{
+        note.textContent='Gemensam topplista via Supabase.';
+      }
+      note.classList.remove('highscore-error-note');
+    }catch(err){
+      console.warn('Global highscore kunde inte hämtas eller synkas.',err);
+      if(token!==renderToken)return;
+      kicker.textContent='GLOBAL SYNK EJ KLAR';
+      list.innerHTML='<div class="highscore-empty"><strong>Den globala topplistan kunde inte laddas.</strong><br>Ditt lokala rekord visas fortfarande nedan.</div>';
+      note.textContent=friendlyError(err);
+      note.classList.add('highscore-error-note');
+    }
+  }
+
   async function renderHighscore(){
     const token=++renderToken;
     const board=soloSettings();
@@ -34,34 +100,38 @@
     const title=$('highscoreTitle');
     const sub=$('highscoreSub');
     const list=$('highscoreBoard');
+    const localList=$('highscoreLocalBoard');
     const kicker=$('highscoreKicker');
     const note=$('highscoreNote');
-    if(!title||!sub||!list||!kicker||!note)return;
+    if(!title||!sub||!list||!localList||!kicker||!note)return;
 
     title.textContent=`Solo · ${scopeLabel(board)}`;
     sub.textContent=ruleText(board);
     kicker.textContent=GLOBAL?'GLOBAL TOPP 10':'LOKAL TOPP 10';
-    note.textContent=GLOBAL?'Hämtar den gemensamma topplistan…':'Rekorden sparas på den här enheten.';
-    list.innerHTML='<div class="highscore-loading"><span></span>Hämtar highscore…</div>';
+    note.textContent=GLOBAL?'Synkar ditt rekord och hämtar den gemensamma topplistan…':'Rekorden sparas på den här enheten.';
+    note.classList.remove('highscore-error-note');
+    list.innerHTML='<div class="highscore-loading"><span></span>Synkar highscore…</div>';
+    localList.innerHTML=rowsMarkup(localRows,'local');
+    const best=renderMine(board);
 
-    if(!GLOBAL){list.innerHTML=rowsMarkup(localRows,'local');return}
-
-    try{
-      const remote=await GLOBAL.list(board);
-      if(token!==renderToken)return;
-      kicker.textContent='GLOBAL TOPP 10';
-      list.innerHTML=rowsMarkup(remote.entries,'global');
-      note.textContent='Gemensam topplista via Supabase. Ditt personbästa sparas även lokalt som reserv.';
-    }catch(err){
-      console.warn('Global highscore kunde inte hämtas.',err);
-      if(token!==renderToken)return;
-      kicker.textContent='LOKAL TOPP 10';
+    if(!GLOBAL){
       list.innerHTML=rowsMarkup(localRows,'local');
-      note.textContent='Den globala topplistan gick inte att nå just nu. Lokala rekord visas i stället.';
+      return;
     }
+    await loadGlobal(board,best,token);
   }
 
-  function openHighscore(){renderHighscore();$('highscoreModal')?.classList.remove('hidden')}
+  async function retrySync(){
+    const button=$('highscoreRetry');
+    if(button){button.disabled=true;button.textContent='Synkar…'}
+    try{await renderHighscore()}
+    finally{if(button){button.disabled=false;button.textContent='↻ Försök synka igen'}}
+  }
+
+  function openHighscore(){
+    $('highscoreModal')?.classList.remove('hidden');
+    renderHighscore();
+  }
   function closeHighscore(){renderToken++;$('highscoreModal')?.classList.add('hidden')}
 
   function addHighscoreUI(){
@@ -84,9 +154,10 @@
 
     const modal=document.createElement('div');
     modal.id='highscoreModal';modal.className='modal hidden';modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');modal.setAttribute('aria-labelledby','highscoreTitle');
-    modal.innerHTML=`<div class="modal-backdrop"></div><section class="modal-card highscore-modal-card"><button class="modal-close" id="highscoreClose" type="button" aria-label="Stäng">×</button><span class="step-kicker" id="highscoreKicker">GLOBAL TOPP 10</span><div class="highscore-head"><div><h2 id="highscoreTitle">Solo highscore</h2><p id="highscoreSub"></p></div></div><div id="highscoreBoard" class="highscore-board"></div><p class="highscore-note" id="highscoreNote">Hämtar topplistan…</p></section>`;
+    modal.innerHTML=`<div class="modal-backdrop"></div><section class="modal-card highscore-modal-card"><button class="modal-close" id="highscoreClose" type="button" aria-label="Stäng">×</button><span class="step-kicker" id="highscoreKicker">GLOBAL TOPP 10</span><div class="highscore-head"><div><h2 id="highscoreTitle">Solo highscore</h2><p id="highscoreSub"></p></div></div><div id="highscoreMine" class="highscore-mine"></div><div id="highscoreBoard" class="highscore-board"></div><div class="highscore-sync-actions"><button id="highscoreRetry" type="button" class="ghost-button hidden">↻ Försök synka igen</button></div><p class="highscore-note" id="highscoreNote">Hämtar topplistan…</p><div class="highscore-local-section"><span class="highscore-section-label">PÅ DEN HÄR ENHETEN</span><div id="highscoreLocalBoard" class="highscore-board"></div></div></section>`;
     document.body.appendChild(modal);
     $('highscoreClose')?.addEventListener('click',closeHighscore);
+    $('highscoreRetry')?.addEventListener('click',retrySync);
     modal.querySelector('.modal-backdrop')?.addEventListener('click',closeHighscore);
     document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!modal.classList.contains('hidden'))closeHighscore()});
     window.addEventListener('orten:global-highscore-updated',()=>{if(!modal.classList.contains('hidden'))renderHighscore()});
