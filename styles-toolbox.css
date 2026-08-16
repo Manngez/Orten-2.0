@@ -114,7 +114,7 @@ body.orten-toolbox-picking,body.orten-toolbox-picking *{cursor:crosshair!importa
   .toolbox-head button{width:36px;height:36px;border-radius:12px}
   .toolbox-intro{padding:9px 10px}
   .toolbox-intro p{font-size:11px}
-  .toolbox-actions{position:sticky;top:66px;z-index:2;background:rgba(5,14,23,.96);padding:4px 0;margin:6px 0 10px}
+  .toolbox-panel > .toolbox-actions{position:sticky;top:66px;z-index:2;background:rgba(5,14,23,.96);padding:4px 0;margin:6px 0 10px}
   .toolbox-actions button{min-height:42px;font-size:12px}
   .toolbox-grid{grid-template-columns:1fr 1fr}
   .toolbox-status{bottom:-12px;margin:10px -12px -12px;padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
