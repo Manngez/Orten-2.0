@@ -31,6 +31,7 @@
 .wizard-progress span.done{color:#9fb5c7}
 .wizard-progress span.done b{background:rgba(104,246,255,.12);border-color:rgba(104,246,255,.4);color:var(--cyan)}
 
+#setupScreen[data-setup-step="1"] .mode-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
 #setupScreen[data-setup-step="1"] .mode-card,
 #setupScreen[data-setup-step="2"] .segmented button{min-height:116px}
 #setupScreen[data-setup-step="2"] .segmented{gap:10px;background:transparent;border:0;padding:0}
