@@ -50,6 +50,17 @@
     ['soundButton','howToButton','presetGrid','modeGrid','scopeCount','scopeTabs','continentBox','continentSelect','countryBox','countrySelect','customBox','countrySearch','clearCountriesButton','countryChips','placeTypeOptions','themeGrid','autoFollowToggle','labelsToggle','playerCountSelect','playerInputs','strikeCard','strikeLimitSelect','timerSelect','duplicateSelect','summaryRows','startButton','gameScreen','exitGameButton','pauseButton','scopeBadge','modeBadge','turnDot','currentPlayerName','turnSubtext','timerWrap','timerBar','timerText','scoreboard','routeCount','routeList','map','zoomInButton','zoomOutButton','latestButton','fitButton','followButton','fullscreenButton','mapInteractionHint','crossBanner','crossBannerText','inputScopeText','placeForm','placeInput','playButton','searchState','recentChoices','restartButton','placeModal','placeModalClose','placeModalTitle','placeModalText','placeChoices','resultModal','resultIcon','resultTitle','resultText','resultStats','continueButton','playAgainButton','changeSettingsButton','pauseModal','resumeButton','howToModal','howToClose','toast'].forEach(id => els[id] = $(id));
   }
 
+  function ensureDuelModeControls(){
+    if(els.modeGrid && !els.modeGrid.querySelector('[data-mode="duel"]')){
+      const b=document.createElement('button');b.type='button';b.className='mode-card';b.dataset.mode='duel';
+      b.innerHTML='<span class="mode-icon">⚔️</span><strong>Duell</strong><small>Två spelare bygger varsin separat linje.</small>';
+      const solo=els.modeGrid.querySelector('[data-mode="solo"]');els.modeGrid.insertBefore(b,solo||null);
+    }
+    if(els.strikeLimitSelect && !els.strikeLimitSelect.querySelector('option[value="1"]')){
+      const option=new Option('1 korsning','1');els.strikeLimitSelect.insertBefore(option,els.strikeLimitSelect.firstChild);
+    }
+  }
+
   function tone(kind='move'){
     if (storageGet('orten2:sound') === 'off') return;
     try {
@@ -112,14 +123,16 @@
 
   function normalizePlayerCount(){
     if(settings.mode==='solo') settings.playerCount=1;
+    else if(settings.mode==='duel') settings.playerCount=2;
     else if(settings.mode==='elimination') settings.playerCount=clamp(settings.playerCount,3,6);
     else settings.playerCount=clamp(settings.playerCount,2,6);
   }
 
   function renderPlayerCount(){
     const select=els.playerCountSelect; const old=settings.playerCount; select.innerHTML='';
-    const min=settings.mode==='solo'?1:(settings.mode==='elimination'?3:2); const max=settings.mode==='solo'?1:6;
-    for(let i=min;i<=max;i++) select.add(new Option(`${i} ${i===1?'spelare':'spelare'}`,String(i)));
+    const min=settings.mode==='solo'?1:(settings.mode==='duel'?2:(settings.mode==='elimination'?3:2));
+    const max=settings.mode==='solo'?1:(settings.mode==='duel'?2:6);
+    for(let i=min;i<=max;i++) select.add(new Option(`${i} spelare`,String(i)));
     settings.playerCount=clamp(old,min,max); select.value=String(settings.playerCount);
   }
 
@@ -166,14 +179,14 @@
   }
 
   function modeLabel(mode=settings.mode){
-    return {classic:'Klassisk',endurance:'Tålighet',elimination:'Utslagning',solo:'Solo'}[mode] || mode;
+    return {classic:'Klassisk',endurance:'Tålighet',elimination:'Utslagning',duel:'Duell',solo:'Solo'}[mode] || mode;
   }
-  function modeIcon(mode=settings.mode){ return {classic:'⚡',endurance:'🛡️',elimination:'🏆',solo:'🧭'}[mode]||'🎯'; }
+  function modeIcon(mode=settings.mode){ return {classic:'⚡',endurance:'🛡️',elimination:'🏆',duel:'⚔️',solo:'🧭'}[mode]||'🎯'; }
   function placeTypeLabel(type=settings.placeType){ return {any:'Alla spelbara orter',urban:'Städer & större orter',city:'Städer & huvudorter'}[type]||type; }
   function themeLabel(theme=settings.mapTheme){ return {night:'Natt',atlas:'Atlas',paper:'Papper'}[theme]||theme; }
 
   function updateSetupUI(rebuildCountries=false){
-    normalizePlayerCount(); renderPresets();
+    ensureDuelModeControls(); normalizePlayerCount(); renderPresets();
     els.modeGrid.querySelectorAll('[data-mode]').forEach(b=>b.classList.toggle('selected',b.dataset.mode===settings.mode));
     const area=currentAreaKey();
     els.scopeTabs.querySelectorAll('[data-area]').forEach(b=>b.classList.toggle('active',b.dataset.area===area));
@@ -185,6 +198,10 @@
     els.themeGrid.querySelectorAll('[data-theme]').forEach(b=>b.classList.toggle('selected',b.dataset.theme===settings.mapTheme));
     els.autoFollowToggle.checked=settings.autoFollow; els.labelsToggle.checked=settings.labels;
     renderPlayerCount(); renderPlayerInputs();
-    els.strikeCard.classList.toggle('hidden',settings.mode!=='endurance'); els.strikeLimitSelect.value=String(settings.strikeLimit); els.timerSelect.value=String(settings.timer); els.duplicateSelect.value=settings.duplicatePolicy;
+    const usesStrikes=settings.mode==='endurance'||settings.mode==='duel';
+    els.strikeCard.classList.toggle('hidden',!usesStrikes);
+    const strikeLabel=els.strikeCard.querySelector('label');if(strikeLabel)strikeLabel.textContent=settings.mode==='duel'?'Egna korsningar innan förlust':'Korsningar innan förlust';
+    const strikeHelp=els.strikeCard.querySelector('small');if(strikeHelp)strikeHelp.textContent=settings.mode==='duel'?'Bara korsningar med din egen linje räknas.':'Visas bara i Tålighet.';
+    els.strikeLimitSelect.value=String(settings.strikeLimit); els.timerSelect.value=String(settings.timer); els.duplicateSelect.value=settings.duplicatePolicy;
     updateSummary();
   }
