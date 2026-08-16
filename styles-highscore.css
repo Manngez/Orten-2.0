@@ -15,7 +15,15 @@
 .highscore-score{font-size:20px;font-weight:950;color:var(--cyan);font-variant-numeric:tabular-nums}
 .highscore-score small{display:block;font-size:9px;color:var(--muted);font-weight:800;text-align:right;letter-spacing:.04em}
 .highscore-empty{padding:28px 16px;text-align:center;border:1px dashed var(--line);border-radius:14px;color:var(--muted);line-height:1.5}
+.highscore-loading{min-height:86px;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:13px}
+.highscore-loading span{width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--cyan);border-radius:50%;animation:highscoreSpin .8s linear infinite}
 .highscore-note{margin:14px 0 0;color:var(--muted);font-size:11px;text-align:center}
 .result-stat.highscore-best{border-color:rgba(104,246,255,.42);background:rgba(104,246,255,.07)}
 .result-stat.highscore-best strong{color:var(--cyan)}
+.result-stat.global-highscore-stat{border-color:rgba(255,216,106,.34);background:rgba(255,216,106,.055)}
+.result-stat.global-highscore-stat.synced strong{color:#ffd86a}
+.result-stat.global-highscore-stat.syncing strong{animation:highscorePulse 1s ease-in-out infinite}
+.result-stat.global-highscore-stat.sync-error{opacity:.72}
+@keyframes highscoreSpin{to{transform:rotate(360deg)}}
+@keyframes highscorePulse{50%{opacity:.35}}
 @media(max-width:520px){.highscore-row{grid-template-columns:34px minmax(0,1fr) auto;padding:10px}.highscore-score{font-size:18px}}

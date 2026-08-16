@@ -22,6 +22,7 @@ const PRECACHE = [
   './app-setup.js',
   './game-geometry.js',
   './highscore.js',
+  './supabase-highscore.js',
   './app-map.js',
   './map-themes.js',
   './app-search.js',
