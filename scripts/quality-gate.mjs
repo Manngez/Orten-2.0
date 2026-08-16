@@ -88,6 +88,9 @@ ok(/settings\.mode!=='solo'/.test(highscore), 'Highscore-motorn måste blockera 
 ok(/STORAGE_LIMIT=100/.test(highscore), 'Highscore-motorn måste behålla personbästan utanför synlig topp 10.');
 ok(/highscoreButton/.test(highscoreUI) && /resultHighscoreButton/.test(highscoreUI), 'Highscore måste gå att öppna både före och efter spel.');
 ok(/GLOBAL TOPP 10/.test(highscoreUI) && /LOKAL TOPP 10/.test(highscoreUI), 'Highscore-UI måste ha global lista med lokal fallback.');
+ok(/highscoreMine/.test(highscoreUI) && /highscoreLocalBoard/.test(highscoreUI), 'Spelarens lokala rekord måste alltid vara synligt även när global lista är tom.');
+ok(/highscoreRetry/.test(highscoreUI) && /GLOBAL\.record/.test(highscoreUI), 'Highscore-vyn måste kunna återförsöka global synkning från lokalt personbästa.');
+ok(/friendlyError/.test(highscoreUI), 'Highscore-vyn måste ge begriplig synkdiagnostik.');
 
 ok(globalHighscore.includes("TABLE='orten_highscores'"), 'Supabase-adaptern måste använda den avsedda highscore-tabellen.');
 ok(globalHighscore.includes('signInAnonymously'), 'Global highscore måste skapa anonym spelaridentitet före skrivning.');
@@ -111,4 +114,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Quality gate OK: ${requiredFiles.length} kritiska filer, ${expectedIds.length} DOM-kontrakt, ${loaderFiles.length} klientmoduler, lokal + global highscore, PWA, kartteman och säkerhetsregler verifierade.`);
+console.log(`Quality gate OK: ${requiredFiles.length} kritiska filer, ${expectedIds.length} DOM-kontrakt, ${loaderFiles.length} klientmoduler, lokal + global highscore, synlig lokal reserv, PWA, kartteman och säkerhetsregler verifierade.`);
