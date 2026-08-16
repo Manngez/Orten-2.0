@@ -1,3 +1,5 @@
+  const SCORE = window.OrtenHighscore;
+
   function ensureSearchWorker(){
     if(searchWorker) return searchWorker;
     if(!('Worker' in window)) throw new Error('Den här webbläsaren saknar stöd för Web Workers.');
@@ -101,12 +103,23 @@
   }
 
   function statCards(){return `<div class="result-stat"><strong>${game.totalMoves}</strong><span>DRAG TOTALT</span></div><div class="result-stat"><strong>${game.bestRound||game.roundMoves}</strong><span>BÄSTA RUTT</span></div><div class="result-stat"><strong>${game.totalCrossings}</strong><span>KORSNINGAR</span></div>`}
+  function recordSoloHighscore(){
+    if(!SCORE||game.settings?.mode!=='solo')return null;
+    return SCORE.record({settings:game.settings,playerName:game.players[0]?.name,score:game.route.length,completedAt:Date.now()});
+  }
+  function highscoreStat(result){
+    if(!result?.eligible)return '';
+    if(result.personalBest)return `<div class="result-stat highscore-best"><strong>#${result.rank||'–'}</strong><span>NYTT PERSONBÄSTA · ${result.score} ORTER</span></div>`;
+    if(result.previousBest!=null)return `<div class="result-stat"><strong>${result.previousBest}</strong><span>PERSONBÄSTA · PLATS #${result.rank||'–'}</span></div>`;
+    return '';
+  }
   function showFinalResult({kind,loser,winner}){
     els.continueButton.classList.add('hidden');els.playAgainButton.classList.remove('hidden');els.changeSettingsButton.classList.remove('hidden');
     if(kind==='winner'){els.resultIcon.textContent='🏆';els.resultTitle.textContent=`${winner?.name||'Vinnaren'} vinner!`;els.resultText.textContent=`Alla andra spelare har slagits ut efter ${game.round} rundor.`;}
     else if(kind==='solo'){els.resultIcon.textContent='🧭';els.resultTitle.textContent='Rutten korsades';els.resultText.textContent=`Din rutt nådde ${game.route.length} orter innan en ny sträcka skar en tidigare linje.`;}
     else{els.resultIcon.textContent='⚡';els.resultTitle.textContent=`${loser?.name||'Spelaren'} korsade linjen`;els.resultText.textContent=`Rutten höll i ${game.roundMoves} orter. Den korsade sträckan är markerad på kartan.`;}
-    els.resultStats.innerHTML=statCards();els.resultModal.classList.remove('hidden');
+    const highscore=kind==='solo'?recordSoloHighscore():null;
+    els.resultStats.innerHTML=statCards()+highscoreStat(highscore);els.resultModal.classList.remove('hidden');
   }
 
   function showEliminationRoundResult(loser){
