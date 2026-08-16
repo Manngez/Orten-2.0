@@ -16,7 +16,7 @@
     window.Worker=VersionedWorker;
   }
 
-  const files=['app-core.js','app-setup.js','app-map.js','map-themes.js','app-search.js','app-ui.js','app-online.js'];
+  const files=['app-core.js','app-setup.js','app-map.js','map-themes.js','app-search.js','app-ui.js','app-online.js','app-online-entry.js'];
   const load=i=>{
     if(i>=files.length)return;
     const s=document.createElement('script');
