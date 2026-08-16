@@ -26,7 +26,7 @@
     },{once:true});
   }
 
-  const files=['app-core.js','app-setup.js','game-geometry.js','highscore.js','supabase-highscore.js','app-map.js','map-themes.js','app-search.js','app-ui.js','app-highscore-ui.js','app-online.js','app-online-entry.js'];
+  const files=['app-core.js','app-setup.js','game-geometry.js','duel-routes.js','highscore.js','supabase-highscore.js','app-map.js','map-themes.js','app-search.js','app-ui.js','app-highscore-ui.js','app-online.js','app-online-entry.js'];
   const load=i=>{
     if(i>=files.length)return;
     const s=document.createElement('script');
