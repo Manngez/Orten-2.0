@@ -2,6 +2,7 @@
 @import url("./styles-game.css");
 @import url("./styles-responsive.css");
 @import url("./styles-atlas.css");
+@import url("./styles-highscore.css");
 
 /* Three-step setup flow */
 #setupScreen .setup-main>section.panel{display:none}
