@@ -31,6 +31,13 @@ test('global personal best logic never replaces a better score',()=>{
   assert.equal(GLOBAL.isPersonalBest(8,0),false);
 });
 
+test('global writes require an explicit Solo-result source',()=>{
+  assert.equal(GLOBAL.isEligibleSubmission(sweden,'solo-result'),true);
+  assert.equal(GLOBAL.isEligibleSubmission(sweden,''),false);
+  assert.equal(GLOBAL.isEligibleSubmission({...sweden,mode:'duel'},'solo-result'),false);
+  assert.equal(GLOBAL.isEligibleSubmission({...sweden,mode:'classic'},'solo-result'),false);
+});
+
 test('Supabase SDK is version pinned and project URL is HTTPS',()=>{
   assert.match(GLOBAL.PROJECT_URL,/^https:\/\/[a-z0-9]+\.supabase\.co$/);
   assert.equal(GLOBAL.SDK_URL,'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0');
