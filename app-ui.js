@@ -42,6 +42,42 @@
   function exitToSetup(){game.active=false;game.paused=false;game.finished=false;closeAllGameModals();showScreen('setup');updateSetupUI(false)}
   function restartSame(){if(!game.settings)return;Object.assign(settings,JSON.parse(JSON.stringify(game.settings)));updateSetupUI(true);startGame()}
 
+  function shareResultText(){
+    const area=game.settings?scopeLabel(game.settings):'Världen';
+    const mode=game.settings?modeLabel(game.settings.mode):'Klassisk';
+    let headline=`Vi klarade ${game.totalMoves} drag i Orten 2.0.`;
+    if(game.settings?.mode==='solo') headline=`Jag nådde ${game.route.length} orter i Orten 2.0 innan rutten korsades.`;
+    else if(game.settings?.mode==='elimination'&&game.finished){
+      const winner=game.players.find(p=>p.active);
+      if(winner) headline=`${winner.name} vann Orten 2.0 efter ${game.round} rundor.`;
+    }
+    return `🗺️ Orten 2.0\n${headline}\n${mode} · ${area}\nKan du slå resultatet?`;
+  }
+
+  async function shareResult(){
+    const text=shareResultText();
+    const url=location.href.split(/[?#]/)[0];
+    if(navigator.share){
+      try{await navigator.share({title:'Orten 2.0',text,url});toast('Resultatet är redo att delas.');return}
+      catch(err){if(err?.name==='AbortError')return}
+    }
+    const combined=`${text}\n${url}`;
+    try{
+      if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(combined)}
+      else{
+        const field=document.createElement('textarea');field.value=combined;field.setAttribute('readonly','');field.style.position='fixed';field.style.opacity='0';document.body.appendChild(field);field.select();document.execCommand('copy');field.remove();
+      }
+      toast('Resultat och spellänk kopierade.');
+    }catch{toast('Kunde inte dela automatiskt. Kopiera adressen från webbläsaren.','error')}
+  }
+
+  function addShareResultButton(){
+    if($('shareResultButton'))return;
+    const actions=els.resultModal?.querySelector('.result-actions');if(!actions)return;
+    const b=document.createElement('button');b.id='shareResultButton';b.type='button';b.className='ghost-button';b.textContent='↗ Dela resultat';b.addEventListener('click',shareResult);
+    actions.insertBefore(b,els.playAgainButton);
+  }
+
   function bindGameEvents(){
     els.placeForm.addEventListener('submit',onPlaceSubmit);els.placeModalClose.addEventListener('click',closePlaceChooser);els.placeModal.querySelector('.modal-backdrop')?.addEventListener('click',closePlaceChooser);
     els.routeList.addEventListener('click',e=>{const li=e.target.closest('[data-index]');if(li)focusPlace(Number(li.dataset.index))});
@@ -64,7 +100,7 @@
   }
 
   function init(){
-    initEls();setupCountryControls();renderPresets();bindSetupEvents();bindGameEvents();updateSound();updateSetupUI(true);addMobileRouteDrawer();
+    initEls();setupCountryControls();renderPresets();bindSetupEvents();bindGameEvents();updateSound();updateSetupUI(true);addMobileRouteDrawer();addShareResultButton();
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();

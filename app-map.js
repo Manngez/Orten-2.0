@@ -1,3 +1,6 @@
+  const G = window.OrtenGeometry;
+  if(!G) throw new Error('OrtenGeometry saknas. Spelet stoppas för att undvika felaktig korsningsberäkning.');
+
   function closeAllGameModals(){
     [els.placeModal,els.resultModal,els.pauseModal].forEach(m=>m.classList.add('hidden')); placeChooserOpen=false;
   }
@@ -47,13 +50,7 @@
     return L.divIcon({className:'city-marker-wrap',html:`<div class="city-marker${latest}" style="--marker:${color}">${idx+1}</div>`,iconSize:[26,26],iconAnchor:[13,13]});
   }
 
-  function segmentParts(a,b){
-    const lon1=a.lon,lon2=b.lon; const diff=lon2-lon1;
-    if(Math.abs(diff)<=180) return [[[a.lat,lon1],[b.lat,lon2]]];
-    if(lon1>0 && lon2<0){const adj=lon2+360;const t=(180-lon1)/(adj-lon1);const lat=a.lat+(b.lat-a.lat)*t;return [[[a.lat,lon1],[lat,180]],[[lat,-180],[b.lat,lon2]]];}
-    if(lon1<0 && lon2>0){const adj=lon2-360;const t=(-180-lon1)/(adj-lon1);const lat=a.lat+(b.lat-a.lat)*t;return [[[a.lat,lon1],[lat,-180]],[[lat,180],[b.lat,lon2]]];}
-    return [[[a.lat,lon1],[b.lat,lon2]]];
-  }
+  function segmentParts(a,b){ return G.segmentParts(a,b); }
 
   function renderMap(){
     if(!map||!routeLayer)return; routeLayer.clearLayers(); const crossed=new Set(game.lastCrossings.map(c=>c.crossedSegmentIndex));
@@ -84,17 +81,10 @@
     const bounds=L.latLngBounds(slice.map(p=>[p.lat,p.lon])); withProgrammaticMap(()=>map.flyToBounds(bounds,{padding:[55,55],maxZoom:6.5,duration:.6}));
   }
 
-  function unwrapLon(lon,prevUx){let x=lon;if(prevUx==null)return x;while(x-prevUx>180)x-=360;while(x-prevUx<-180)x+=360;return x;}
-  function mercY(lat){const r=clamp(lat,-85,85)*Math.PI/180;return Math.log(Math.tan(Math.PI/4+r/2));}
-  function normalizeLon(x){let lon=((x+180)%360+360)%360-180;return lon===-180?180:lon;}
-  function intersectionOf(a,b,c,d){
-    const A={x:a.ux,y:mercY(a.lat)},B={x:b.ux,y:mercY(b.lat)},C={x:c.ux,y:mercY(c.lat)},D2={x:d.ux,y:mercY(d.lat)};
-    const r={x:B.x-A.x,y:B.y-A.y},s={x:D2.x-C.x,y:D2.y-C.y}; const den=r.x*s.y-r.y*s.x; if(Math.abs(den)<1e-12)return null;
-    const q={x:C.x-A.x,y:C.y-A.y}; const t=(q.x*s.y-q.y*s.x)/den; const u=(q.x*r.y-q.y*r.x)/den; const eps=1e-8;
-    if(t<=eps||t>1+eps||u<=eps||u>=1-eps)return null;
-    const x=A.x+t*r.x,y=A.y+t*r.y; const lat=(2*Math.atan(Math.exp(y))-Math.PI/2)*180/Math.PI;
-    return {lat,lon:normalizeLon(x),ux:x,t,u};
-  }
+  function unwrapLon(lon,prevUx){ return G.unwrapLon(lon,prevUx); }
+  function mercY(lat){ return G.mercY(lat); }
+  function normalizeLon(x){ return G.normalizeLon(x); }
+  function intersectionOf(a,b,c,d){ return G.intersectionOf(a,b,c,d); }
 
   function crossingsForNewPlace(place){
     if(game.route.length<3)return [];
@@ -106,7 +96,7 @@
   }
 
   function stablePlaceKey(p){ return p.geonameId?`gn:${p.geonameId}`:(p.id||`${norm(p.name)}|${p.countryCode}|${norm(p.region)}|${p.lat.toFixed(4)}|${p.lon.toFixed(4)}`); }
-  function haversine(a,b){const R=6371,toR=v=>v*Math.PI/180,dLat=toR(b.lat-a.lat),dLon=toR(b.lon-a.lon);const s=Math.sin(dLat/2)**2+Math.cos(toR(a.lat))*Math.cos(toR(b.lat))*Math.sin(dLon/2)**2;return 2*R*Math.asin(Math.sqrt(s));}
+  function haversine(a,b){ return G.haversine(a,b); }
   function isDuplicate(place){
     if(game.settings.duplicatePolicy==='allow')return false;
     if(game.settings.duplicatePolicy==='nameCountry')return game.route.some(p=>norm(p.name)===norm(place.name)&&p.countryCode===place.countryCode);

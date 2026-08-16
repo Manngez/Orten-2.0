@@ -1,11 +1,16 @@
 {
+  "id": "./",
   "name": "Orten 2.0",
   "short_name": "Orten 2.0",
+  "lang": "sv",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "any",
   "background_color": "#07111f",
   "theme_color": "#07111f",
   "description": "Ett världsomspännande geografispel där orter binds ihop utan att rutten korsar sig.",
+  "categories": ["games", "education"],
   "icons": [
     {
       "src": "assets/logo.svg",
