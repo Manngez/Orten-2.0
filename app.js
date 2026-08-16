@@ -27,6 +27,10 @@
   }
 
   const files=['app-core.js','app-setup.js','game-geometry.js','duel-routes.js','highscore.js','supabase-highscore.js','app-map.js','map-themes.js','app-search.js','app-ui.js','app-highscore-ui.js','app-online.js','app-online-entry.js'];
+  try{
+    const params=new URL(location.href).searchParams;
+    if(params.get('verktyg')==='1'||params.get('toolbox')==='1')files.push('app-toolbox.js');
+  }catch{}
   const load=i=>{
     if(i>=files.length)return;
     const s=document.createElement('script');
