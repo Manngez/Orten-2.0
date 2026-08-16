@@ -10,10 +10,10 @@ const fileExists = path => existsSync(join(root, path));
 
 const requiredFiles = [
   'index.html', 'styles.css', 'styles-base.css', 'styles-game.css', 'styles-responsive.css',
-  'styles-atlas.css', 'styles-map-themes.css', 'manifest.webmanifest', 'data.js', 'app.js',
+  'styles-atlas.css', 'styles-map-themes.css', 'styles-highscore.css', 'manifest.webmanifest', 'data.js', 'app.js',
   'app-core.js', 'app-setup.js', 'app-map.js', 'map-themes.js', 'app-search.js', 'app-ui.js',
-  'app-online.js', 'app-online-entry.js', 'place-worker.js', 'game-geometry.js', 'service-worker.js',
-  'assets/logo.svg', 'data/world-places.json', 'data/world-meta.json'
+  'app-highscore-ui.js', 'app-online.js', 'app-online-entry.js', 'place-worker.js', 'game-geometry.js', 'highscore.js', 'service-worker.js',
+  'tests/geometry.test.mjs', 'tests/highscore.test.mjs', 'assets/logo.svg', 'data/world-places.json', 'data/world-meta.json'
 ];
 
 for (const file of requiredFiles) ok(fileExists(file), `Saknad kritisk fil: ${file}`);
@@ -24,6 +24,8 @@ const core = read('app-core.js');
 const mapThemes = read('map-themes.js');
 const css = read('styles.css');
 const sw = read('service-worker.js');
+const highscore = read('highscore.js');
+const highscoreUI = read('app-highscore-ui.js');
 
 ok(/<html\s+lang="sv"/i.test(html), 'index.html måste deklarera svenska som språk.');
 ok(/name="viewport"/i.test(html), 'Viewport-meta saknas.');
@@ -42,13 +44,17 @@ for (const id of expectedIds) ok(htmlIds.includes(id), `app-core.js förväntar 
 
 const loaderBlock = app.match(/const\s+files\s*=\s*\[([\s\S]*?)\]/)?.[1] || '';
 const loaderFiles = [...loaderBlock.matchAll(/'([^']+\.js)'/g)].map(match => match[1]);
-ok(loaderFiles.length >= 8, 'app.js kunde inte verifiera modulordningen.');
+ok(loaderFiles.length >= 10, 'app.js kunde inte verifiera modulordningen.');
 for (const file of loaderFiles) ok(fileExists(file), `app.js försöker ladda en fil som saknas: ${file}`);
 ok(loaderFiles.includes('game-geometry.js'), 'Den testade geometri-motorn måste laddas av app.js.');
 ok(loaderFiles.indexOf('game-geometry.js') < loaderFiles.indexOf('app-map.js'), 'game-geometry.js måste laddas före app-map.js.');
+ok(loaderFiles.includes('highscore.js'), 'Highscore-motorn måste laddas av app.js.');
+ok(loaderFiles.indexOf('highscore.js') < loaderFiles.indexOf('app-search.js'), 'highscore.js måste laddas före app-search.js.');
+ok(loaderFiles.indexOf('app-highscore-ui.js') > loaderFiles.indexOf('app-ui.js'), 'Highscore-UI måste laddas efter grundläggande app-ui.js.');
 
 const imports = [...css.matchAll(/@import\s+url\(["']\.\/([^"']+)["']\)/g)].map(match => match[1].split('?')[0]);
 for (const file of imports) ok(fileExists(file), `styles.css importerar en fil som saknas: ${file}`);
+ok(imports.includes('styles-highscore.css'), 'Highscore-stilar måste importeras från styles.css.');
 
 let manifest;
 try { manifest = JSON.parse(read('manifest.webmanifest')); }
@@ -69,6 +75,13 @@ for (const url of tileUrls) ok(url.includes('_nolabels'), `Karttema får inte vi
 ok(/serviceWorker\.register/.test(app), 'Service Worker måste registreras från app.js.');
 ok(/world-places\.json/.test(sw), 'Service Worker måste uttryckligen hantera world-places.json.');
 ok(/NETWORK_ONLY/i.test(sw), 'Det stora ortregistret måste vara network-only för att undvika gammal världsdata i cache.');
+ok(sw.includes("'./highscore.js'"), 'Service Worker måste cacha highscore.js.');
+ok(sw.includes("'./app-highscore-ui.js'"), 'Service Worker måste cacha highscore-UI.');
+ok(sw.includes("'./styles-highscore.css'"), 'Service Worker måste cacha highscore-stilar.');
+
+ok(/settings\.mode!=='solo'/.test(highscore), 'Highscore-motorn måste blockera icke-Solo-resultat.');
+ok(/STORAGE_LIMIT=100/.test(highscore), 'Highscore-motorn måste behålla personbästan utanför synlig topp 10.');
+ok(/highscoreButton/.test(highscoreUI) && /resultHighscoreButton/.test(highscoreUI), 'Highscore måste gå att öppna både före och efter spel.');
 
 const jsFiles = ['app.js', ...loaderFiles, 'place-worker.js', 'data.js', 'service-worker.js'];
 for (const file of [...new Set(jsFiles)]) {
@@ -83,4 +96,4 @@ if (failures.length) {
   process.exit(1);
 }
 
-console.log(`Quality gate OK: ${requiredFiles.length} kritiska filer, ${expectedIds.length} DOM-kontrakt, ${loaderFiles.length} klientmoduler, PWA, kartteman och säkerhetsregler verifierade.`);
+console.log(`Quality gate OK: ${requiredFiles.length} kritiska filer, ${expectedIds.length} DOM-kontrakt, ${loaderFiles.length} klientmoduler, highscore, PWA, kartteman och säkerhetsregler verifierade.`);
