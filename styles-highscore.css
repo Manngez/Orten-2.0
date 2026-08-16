@@ -17,7 +17,18 @@
 .highscore-empty{padding:28px 16px;text-align:center;border:1px dashed var(--line);border-radius:14px;color:var(--muted);line-height:1.5}
 .highscore-loading{min-height:86px;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:13px}
 .highscore-loading span{width:18px;height:18px;border:2px solid var(--line);border-top-color:var(--cyan);border-radius:50%;animation:highscoreSpin .8s linear infinite}
-.highscore-note{margin:14px 0 0;color:var(--muted);font-size:11px;text-align:center}
+.highscore-mine{margin:10px 0 4px}
+.highscore-mine-card,.highscore-mine-empty{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:13px 14px;border:1px solid rgba(104,246,255,.34);border-radius:14px;background:rgba(104,246,255,.055)}
+.highscore-mine-card span,.highscore-mine-empty span,.highscore-section-label{display:block;color:var(--muted);font-size:10px;font-weight:900;letter-spacing:.08em}
+.highscore-mine-card strong,.highscore-mine-empty strong{display:block;margin-top:4px;font-size:14px}
+.highscore-mine-score{font-size:26px;font-weight:950;color:var(--cyan);text-align:right;font-variant-numeric:tabular-nums}
+.highscore-mine-score small{display:block;font-size:9px;color:var(--muted);letter-spacing:.06em}
+.highscore-sync-actions{display:flex;justify-content:center;margin-top:12px}
+.highscore-sync-actions .ghost-button{min-height:36px;padding:7px 12px;font-size:12px}
+.highscore-note{margin:12px 0 0;color:var(--muted);font-size:11px;text-align:center}
+.highscore-note.highscore-error-note{color:#ffb1a0}
+.highscore-local-section{margin-top:18px;padding-top:15px;border-top:1px solid var(--line)}
+.highscore-local-section .highscore-board{margin-top:8px}
 .result-stat.highscore-best{border-color:rgba(104,246,255,.42);background:rgba(104,246,255,.07)}
 .result-stat.highscore-best strong{color:var(--cyan)}
 .result-stat.global-highscore-stat{border-color:rgba(255,216,106,.34);background:rgba(255,216,106,.055)}
@@ -26,4 +37,4 @@
 .result-stat.global-highscore-stat.sync-error{opacity:.72}
 @keyframes highscoreSpin{to{transform:rotate(360deg)}}
 @keyframes highscorePulse{50%{opacity:.35}}
-@media(max-width:520px){.highscore-row{grid-template-columns:34px minmax(0,1fr) auto;padding:10px}.highscore-score{font-size:18px}}
+@media(max-width:520px){.highscore-row{grid-template-columns:34px minmax(0,1fr) auto;padding:10px}.highscore-score{font-size:18px}.highscore-mine-card{padding:11px 12px}.highscore-mine-score{font-size:22px}}
