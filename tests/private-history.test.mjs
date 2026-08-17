@@ -7,17 +7,25 @@ const CORE=require('../private-history-core.js');
 
 test('private history row keys round-trip and group complete payloads',()=>{
   const encoded='A'.repeat(2100);
-  const rows=CORE.chunkPayload(encoded,{stamp:1723910000000,matchId:'match_123',chunkSize:700});
-  assert.equal(rows.length,3);
+  const rows=CORE.chunkPayload(encoded,{stamp:1723910000000,matchId:'match_123',chunkSize:200});
+  assert.equal(rows.length,11);
   assert.equal(CORE.parseRowKey(rows[0].boardKey).matchId,'match_123');
-  const shuffled=[rows[2],rows[0],rows[1]].map(part=>({board_key:part.boardKey,updated_at:'2026-08-17T10:00:00Z'}));
+  const shuffled=[...rows].reverse().map(part=>({board_key:part.boardKey,updated_at:'2026-08-17T10:00:00Z'}));
   const grouped=CORE.groupRows(shuffled);
   assert.equal(grouped.length,1);
   assert.equal(grouped[0].encoded,encoded);
 });
 
+test('default private history rows stay short enough for constrained board keys',()=>{
+  const rows=CORE.chunkPayload('C'.repeat(5000),{stamp:1723910000000,matchId:'abcdefghijklmnopqrstuv'});
+  assert.ok(rows.length>50);
+  assert.ok(Math.max(...rows.map(row=>row.boardKey.length))<=120);
+  assert.equal(rows.map(row=>CORE.parseRowKey(row.boardKey).chunk).join(''),'C'.repeat(5000));
+});
+
 test('incomplete private history chunks are never exposed as a session',()=>{
-  const rows=CORE.chunkPayload('B'.repeat(1800),{stamp:1723910000000,matchId:'missing_chunk',chunkSize:600});
+  const rows=CORE.chunkPayload('B'.repeat(1800),{stamp:1723910000000,matchId:'missing_chunk',chunkSize:200});
+  assert.ok(rows.length>3);
   assert.equal(CORE.groupRows([{board_key:rows[0].boardKey},{board_key:rows[2].boardKey}]).length,0);
 });
 
