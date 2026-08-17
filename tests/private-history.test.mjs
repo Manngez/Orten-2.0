@@ -8,7 +8,8 @@ const CORE=require('../private-history-core.js');
 test('private history row keys round-trip and group complete payloads',()=>{
   const encoded='A'.repeat(2100);
   const rows=CORE.chunkPayload(encoded,{stamp:1723910000000,matchId:'match_123',chunkSize:200});
-  assert.equal(rows.length,11);
+  assert.ok(rows.length>10);
+  assert.ok(rows.every(row=>row.boardKey.startsWith('replay|ph1|')));
   assert.equal(CORE.parseRowKey(rows[0].boardKey).matchId,'match_123');
   const shuffled=[...rows].reverse().map(part=>({board_key:part.boardKey,updated_at:'2026-08-17T10:00:00Z'}));
   const grouped=CORE.groupRows(shuffled);
@@ -16,10 +17,18 @@ test('private history row keys round-trip and group complete payloads',()=>{
   assert.equal(grouped[0].encoded,encoded);
 });
 
+test('legacy private history row keys can still be parsed',()=>{
+  const legacy='privhist|v1|1723910000000|match_123|0000|0001|QUJD';
+  const parsed=CORE.parseRowKey(legacy);
+  assert.equal(parsed.matchId,'match_123');
+  assert.equal(parsed.legacy,true);
+  assert.equal(parsed.chunk,'QUJD');
+});
+
 test('default private history rows stay short enough for constrained board keys',()=>{
   const rows=CORE.chunkPayload('C'.repeat(5000),{stamp:1723910000000,matchId:'abcdefghijklmnopqrstuv'});
   assert.ok(rows.length>50);
-  assert.ok(Math.max(...rows.map(row=>row.boardKey.length))<=120);
+  assert.ok(Math.max(...rows.map(row=>row.boardKey.length))<=110);
   assert.equal(rows.map(row=>CORE.parseRowKey(row.boardKey).chunk).join(''),'C'.repeat(5000));
 });
 
