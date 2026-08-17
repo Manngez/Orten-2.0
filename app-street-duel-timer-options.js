@@ -21,8 +21,10 @@
   function save(value){
     selectedSeconds=OPTIONS.includes(Number(value))?Number(value):DEFAULT_SECONDS;
     try{localStorage.setItem(STORAGE_KEY,String(selectedSeconds));}catch{}
+    lastTimerText='';
     syncTimerPresentation();
     syncRulesText();
+    syncLobbyCopy();
   }
 
   function isStreetDuelTimer(handler,delay){
@@ -54,7 +56,7 @@
     if(selectedSeconds===0){
       if(track) track.style.display='none';
       text.style.display='block';
-      text.textContent='Ingen tidsgräns';
+      if(text.textContent!=='Ingen tidsgräns') text.textContent='Ingen tidsgräns';
       lastTimerText='Ingen tidsgräns';
       return;
     }
@@ -67,7 +69,7 @@
     if(Number.isFinite(raw)){
       const shown=Math.max(0,Math.ceil(raw*(selectedSeconds/DEFAULT_SECONDS)));
       const next=`${shown} sek`;
-      text.textContent=next;
+      if(current!==next) text.textContent=next;
       lastTimerText=next;
     }else if(bar){
       lastTimerText='';
@@ -77,9 +79,10 @@
   function syncRulesText(){
     const rules=document.querySelector('.street-duel-rules');
     if(!rules) return;
-    rules.innerHTML=selectedSeconds===0
+    const next=selectedSeconds===0
       ? '<strong>Så avgörs rundan</strong>Fel korsning eller återanvänd gata förlorar rundan. Gatan måste finnas i Umeås gatnät. Först till tre rundvinster vinner matchen.'
       : '<strong>Så avgörs rundan</strong>Fel korsning, återanvänd gata eller slut på tiden förlorar rundan. Gatan måste finnas i Umeås gatnät. Först till tre rundvinster vinner matchen.';
+    if(rules.innerHTML!==next) rules.innerHTML=next;
   }
 
   function ensureTimerChoice(){
@@ -99,9 +102,11 @@
     const card=document.getElementById('streetDuelOverlayCard');
     if(!card||!document.getElementById('streetDuelStart')) return;
     const p=card.querySelector('p');
-    if(p) p.textContent=selectedSeconds===0
+    if(!p) return;
+    const next=selectedSeconds===0
       ? 'Ni turas om att skriva en gata som faktiskt korsar den aktuella gatan. Fel korsning kostar rundan. Först till tre rundvinster vinner.'
       : 'Ni turas om att skriva en gata som faktiskt korsar den aktuella gatan. Fel korsning eller slut på tiden kostar rundan. Först till tre rundvinster vinner.';
+    if(p.textContent!==next) p.textContent=next;
   }
 
   function syncAll(){
