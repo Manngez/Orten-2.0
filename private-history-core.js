@@ -7,7 +7,9 @@
 })(typeof globalThis!=='undefined'?globalThis:this,function(root){
   const VERSION=1;
   const PREFIX='privhist|v1|';
-  const DEFAULT_CHUNK_SIZE=850;
+  // Håll hela board_key under ca 120 tecken även om databaskolumnen är längdbegränsad.
+  // Payloaden delas hellre i fler små rader än att en hel omgång nekas av Supabase.
+  const DEFAULT_CHUNK_SIZE=56;
   const INFO_TEXT='orten2-private-history-v1';
   const ADMIN_PUBLIC_JWK=Object.freeze({kty:'EC',crv:'P-256',x:'mLOL_N9JSeLuqgXPS1raijmrNhbbdnvlado1sFRwhwY',y:'9m7kN8ry33bpOn5axugqYLqEgo7CM8uy2WQulX1HAd8',ext:true});
   const encoder=typeof TextEncoder!=='undefined'?new TextEncoder():null;
@@ -31,7 +33,7 @@
 
   function buildRowKey({stamp,matchId,index,total,chunk}){const s=Math.floor(Number(stamp)),i=Math.floor(Number(index)),n=Math.floor(Number(total));if(!Number.isFinite(s)||s<1||!Number.isFinite(i)||i<0||!Number.isFinite(n)||n<1||i>=n)throw new Error('Ogiltig historikrad.');const match=String(matchId||'').replace(/[^A-Za-z0-9_-]/g,'').slice(0,40);if(!match)throw new Error('Match-id saknas.');const data=String(chunk||'');if(!/^[A-Za-z0-9_-]+$/.test(data))throw new Error('Ogiltigt historikblock.');return `${PREFIX}${s}|${match}|${String(i).padStart(4,'0')}|${String(n).padStart(4,'0')}|${data}`}
   function parseRowKey(value=''){const text=String(value);if(!text.startsWith(PREFIX))return null;const parts=text.split('|');if(parts.length!==7||parts[0]!=='privhist'||parts[1]!=='v1')return null;const stamp=Number(parts[2]),index=Number(parts[4]),total=Number(parts[5]);if(!Number.isFinite(stamp)||stamp<1||!Number.isFinite(index)||index<0||!Number.isFinite(total)||total<1||index>=total)return null;if(!/^[A-Za-z0-9_-]+$/.test(parts[3])||!/^[A-Za-z0-9_-]+$/.test(parts[6]))return null;return {stamp,matchId:parts[3],index,total,chunk:parts[6]}}
-  function chunkPayload(encoded,{stamp,matchId,chunkSize=DEFAULT_CHUNK_SIZE}={}){const text=String(encoded||'');if(!text)throw new Error('Historikpayload saknas.');const size=Math.max(200,Math.min(1400,Math.floor(Number(chunkSize)||DEFAULT_CHUNK_SIZE))),chunks=[];for(let i=0;i<text.length;i+=size)chunks.push(text.slice(i,i+size));return chunks.map((chunk,index)=>({index,total:chunks.length,chunk,boardKey:buildRowKey({stamp,matchId,index,total:chunks.length,chunk})}))}
+  function chunkPayload(encoded,{stamp,matchId,chunkSize=DEFAULT_CHUNK_SIZE}={}){const text=String(encoded||'');if(!text)throw new Error('Historikpayload saknas.');const size=Math.max(24,Math.min(256,Math.floor(Number(chunkSize)||DEFAULT_CHUNK_SIZE))),chunks=[];for(let i=0;i<text.length;i+=size)chunks.push(text.slice(i,i+size));return chunks.map((chunk,index)=>({index,total:chunks.length,chunk,boardKey:buildRowKey({stamp,matchId,index,total:chunks.length,chunk})}))}
   function groupRows(rows=[]){const groups=new Map();for(const row of Array.isArray(rows)?rows:[]){const parsed=parseRowKey(row?.board_key||row?.boardKey);if(!parsed)continue;const key=`${parsed.stamp}|${parsed.matchId}|${parsed.total}`;let group=groups.get(key);if(!group){group={stamp:parsed.stamp,matchId:parsed.matchId,total:parsed.total,parts:new Map(),updatedAt:row?.updated_at||row?.updatedAt||null};groups.set(key,group)}if(!group.parts.has(parsed.index))group.parts.set(parsed.index,parsed.chunk)}return [...groups.values()].filter(group=>group.parts.size===group.total).map(group=>({stamp:group.stamp,matchId:group.matchId,total:group.total,updatedAt:group.updatedAt,encoded:Array.from({length:group.total},(_,i)=>group.parts.get(i)||'').join('')})).sort((a,b)=>b.stamp-a.stamp)}
 
   async function hashText(value=''){if(!encoder)throw new Error('TextEncoder saknas.');const c=cryptoApi();return bytesToBase64Url(await c.subtle.digest('SHA-256',encoder.encode(String(value))))}
