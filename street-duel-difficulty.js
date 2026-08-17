@@ -32,6 +32,7 @@
     if(!start||!target) return null;
     const limit=Math.max(0,Math.min(12,Number(maxSteps)||0));
     if(norm(start)===norm(target)) return [start];
+    const targetKey=norm(target);
     const queue=[[start]];
     const visited=new Set([norm(start)]);
     while(queue.length){
@@ -42,7 +43,7 @@
         const key=norm(next);
         if(visited.has(key)) continue;
         const nextPath=[...path,next];
-        if(key===norm(target)) return nextPath;
+        if(key===targetKey) return nextPath;
         visited.add(key);
         queue.push(nextPath);
       }
@@ -56,10 +57,10 @@
     if(!candidateName) return {ok:false,reason:'unknown'};
     const usedKeys=new Set((used||[]).map(norm));
     if(usedKeys.has(norm(candidateName))) return {ok:false,reason:'used',name:candidateName};
-    if(!currentName) return {ok:false,reason:'not-crossing',name:candidateName};
+    if(!currentName) return {ok:false,reason:'not-crossing',name:candidateName,maxSteps:Number(maxSteps)||1};
     const path=shortestPath(graph,currentName,candidateName,maxSteps);
-    if(!path) return {ok:false,reason:'not-crossing',name:candidateName,maxSteps:Number(maxSteps)||1};
-    return {ok:true,name:candidateName,steps:path.length-1,path,maxSteps:Number(maxSteps)||1};
+    if(!path) return {ok:false,reason:'not-crossing',name:candidateName,current:currentName,maxSteps:Number(maxSteps)||1};
+    return {ok:true,name:candidateName,current:currentName,steps:path.length-1,path,maxSteps:Number(maxSteps)||1};
   }
 
   function reachableUnused(graph,current,used=[],maxSteps=1){
@@ -98,16 +99,19 @@
     }catch{}
 
     let lastResult=null;
+    let lastAttempt=null;
     let syncing=false;
     const currentLevel=()=>getLevel(selectedKey);
+    const defer=fn=>typeof win.queueMicrotask==='function'?win.queueMicrotask(fn):win.setTimeout(fn,0);
 
-    const originalValidate=engine.validateMove?.bind(engine);
-    const originalUnused=engine.unusedNeighbors?.bind(engine);
+    const originalValidate=engine.validateMove;
+    const originalUnused=engine.unusedNeighbors;
     engine.validateMove=function(graph,current,candidate,used=[]){
       const level=currentLevel();
       const result=validateMove(graph,current,candidate,used,level.steps);
       lastResult=result.ok?result:null;
-      win.queueMicrotask?.(()=>renderPath());
+      lastAttempt={result,level,current:resolve(graph,current)||String(current||''),candidate:result.name||resolve(graph,candidate)||String(candidate||'')};
+      defer(()=>{rewriteOutcomeCopy();renderPath();});
       return result;
     };
     engine.unusedNeighbors=function(graph,current,used=[]){
@@ -118,6 +122,7 @@
       selectedKey=LEVELS[key]?key:'hard';
       try{win.localStorage.setItem(STORAGE_KEY,selectedKey);}catch{}
       lastResult=null;
+      lastAttempt=null;
       syncAll();
     }
 
@@ -154,9 +159,10 @@
     function syncText(){
       const level=currentLevel();
       const help=win.document.getElementById('streetDuelDifficultyHelp');
-      if(help) help.textContent=level.help;
+      if(help&&help.textContent!==level.help) help.textContent=level.help;
       const status=win.document.getElementById('streetDuelDifficultyStatus');
-      if(status) status.textContent=`${level.icon} ${level.label} · ${level.steps===1?'direkt anslutning':'max '+level.steps+' steg'}`;
+      const statusText=`${level.icon} ${level.label} · ${level.steps===1?'direkt anslutning':'max '+level.steps+' steg'}`;
+      if(status&&status.textContent!==statusText) status.textContent=statusText;
       const select=win.document.getElementById('streetDuelDifficultySelect');
       if(select&&select.value!==selectedKey) select.value=selectedKey;
     }
@@ -166,18 +172,42 @@
       if(!hint) return;
       const level=currentLevel();
       if(!lastResult?.ok||level.steps===1){
-        hint.style.display='none';hint.textContent='';return;
+        if(hint.style.display!=='none') hint.style.display='none';
+        if(hint.textContent) hint.textContent='';
+        return;
       }
-      hint.style.display='block';
-      hint.textContent=`✓ ${lastResult.steps} ${lastResult.steps===1?'steg':'steg'}: ${lastResult.path.join(' → ')}`;
+      const text=`✓ ${lastResult.steps} steg: ${lastResult.path.join(' → ')}`;
+      if(hint.style.display!=='block') hint.style.display='block';
+      if(hint.textContent!==text) hint.textContent=text;
+    }
+
+    function rewriteOutcomeCopy(){
+      const attempt=lastAttempt;
+      if(!attempt||attempt.level.steps===1) return;
+      const message=win.document.getElementById('streetDuelMessage');
+      if(attempt.result.ok&&attempt.result.steps>1){
+        const direct=`${attempt.candidate} korsar ${attempt.current}`;
+        const stepped=`${attempt.candidate} ligger ${attempt.result.steps} steg från ${attempt.current}`;
+        if(message?.textContent.includes(direct)) message.textContent=message.textContent.replace(direct,stepped);
+        return;
+      }
+      if(attempt.result.reason==='not-crossing'){
+        const direct=`${attempt.candidate} korsar inte ${attempt.current}`;
+        const stepped=`${attempt.candidate} ligger inte inom ${attempt.level.steps} steg från ${attempt.current}`;
+        if(message?.textContent.includes(direct)) message.textContent=message.textContent.replace(direct,stepped);
+        const card=win.document.getElementById('streetDuelOverlayCard');
+        for(const el of card?.querySelectorAll('p,div')||[]){
+          if(el.children.length===0&&el.textContent.includes(direct)) el.textContent=el.textContent.replace(direct,stepped);
+        }
+      }
     }
 
     function clearPathOnNewRound(){
       const message=win.document.getElementById('streetDuelMessage');
       if(!message) return;
-      const text=message.textContent.trim();
-      if(text.startsWith('Skriv en gata')){
+      if(message.textContent.trim().startsWith('Skriv en gata')&&lastResult){
         lastResult=null;
+        lastAttempt=null;
         renderPath();
       }
     }
@@ -189,12 +219,13 @@
         ensureChoice();
         ensureGameStatus();
         syncText();
-        renderPath();
         clearPathOnNewRound();
+        rewriteOutcomeCopy();
+        renderPath();
       }finally{syncing=false;}
     }
 
-    const observer=new win.MutationObserver(()=>win.queueMicrotask?.(syncAll));
+    const observer=new win.MutationObserver(()=>defer(syncAll));
     function bootstrap(){
       syncAll();
       observer.observe(win.document.body,{childList:true,subtree:true,characterData:true});
