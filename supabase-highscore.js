@@ -9,6 +9,7 @@
   const PUBLISHABLE_KEY='sb_publishable_lWTB9F286pzThGxYp3Zj2w_uIco-VDU';
   const SDK_URL='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0';
   const TABLE='orten_highscores';
+  const REPLAY_PREFIX='replay|';
   const HS=root?.OrtenHighscore;
 
   let sdkPromise=null;
@@ -33,6 +34,9 @@
         name:cleanName(row.player_name||row.name),
         score:Math.floor(Number(row.score)),
         date:row.updated_at?Date.parse(row.updated_at):(Number(row.date)||0),
+        userId:row.user_id||row.userId||null,
+        boardKey:row.board_key||row.boardKey||null,
+        hasReplay:!!row.hasReplay,
         source:'global'
       }))
       .sort((a,b)=>b.score-a.score||a.date-b.date)
@@ -49,6 +53,48 @@
 
   function isEligibleSubmission(settings={},source=''){
     return settings?.mode==='solo'&&source==='solo-result';
+  }
+
+  function boardToken(value=''){
+    const text=String(value);
+    try{
+      if(typeof Buffer!=='undefined')return Buffer.from(text,'utf8').toString('base64url');
+    }catch{}
+    try{
+      const bytes=new TextEncoder().encode(text);let binary='';
+      bytes.forEach(byte=>{binary+=String.fromCharCode(byte)});
+      return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    }catch{}
+    return Array.from(text).map(ch=>ch.codePointAt(0).toString(16).padStart(4,'0')).join('');
+  }
+
+  function replayPrefix(key,stamp){
+    return `${REPLAY_PREFIX}${boardToken(key)}|${Math.floor(Number(stamp)||0)}|`;
+  }
+
+  function normalizeReplayPoints(route=[]){
+    return (Array.isArray(route)?route:[]).slice(0,500).map((point,index)=>({
+      index:index+1,
+      name:cleanName(point?.name||`Ort ${index+1}`),
+      lat:Number(point?.lat),
+      lon:Number(point?.lon),
+      countryCode:String(point?.countryCode||'').toUpperCase().slice(0,2)
+    })).filter(point=>Number.isFinite(point.lat)&&Number.isFinite(point.lon)&&Math.abs(point.lat)<=90&&Math.abs(point.lon)<=180);
+  }
+
+  function runtimeReplay(){
+    try{
+      if(typeof game!=='undefined'&&game?.settings?.mode==='solo'&&Array.isArray(game.route))return {route:game.route};
+    }catch{}
+    return null;
+  }
+
+  function parseReplayBoardKey(value=''){
+    const parts=String(value).split('|');
+    if(parts.length<7||parts[0]!=='replay')return null;
+    const stamp=Number(parts[2]);const index=Number(parts[3]);const lat=Number(parts[4]);const lon=Number(parts[5]);
+    if(!Number.isFinite(stamp)||!Number.isFinite(index)||!Number.isFinite(lat)||!Number.isFinite(lon))return null;
+    return {token:parts[1],stamp,index,lat,lon,countryCode:String(parts[6]||'').toUpperCase().slice(0,2)};
   }
 
   function loadSDK(){
@@ -100,18 +146,103 @@
     return sessionPromise;
   }
 
-  async function list(settings={}){
-    const key=boardKey(settings);
-    const client=await getClient();
+  async function replayAvailability(client,key,entries){
+    const candidates=entries.filter(row=>row.userId&&row.date);
+    if(!candidates.length)return entries;
+    const userIds=[...new Set(candidates.map(row=>row.userId))];
+    const token=boardToken(key);
     const result=await client
       .from(TABLE)
-      .select('player_name,score,updated_at')
+      .select('user_id,board_key')
+      .in('user_id',userIds)
+      .like('board_key',`${REPLAY_PREFIX}${token}|%`)
+      .limit(1000);
+    if(result.error)return entries;
+    const available=new Set((result.data||[]).map(row=>{
+      const parsed=parseReplayBoardKey(row.board_key);
+      return parsed?`${row.user_id}|${parsed.stamp}`:null;
+    }).filter(Boolean));
+    return entries.map(row=>({...row,hasReplay:available.has(`${row.userId}|${row.date}`)}));
+  }
+
+  async function listByKey(key){
+    const client=await getClient();
+    let result=await client
+      .from(TABLE)
+      .select('user_id,player_name,score,updated_at,board_key')
       .eq('board_key',key)
       .order('score',{ascending:false})
       .order('updated_at',{ascending:true})
       .limit(10);
+
+    if(result.error){
+      result=await client
+        .from(TABLE)
+        .select('player_name,score,updated_at')
+        .eq('board_key',key)
+        .order('score',{ascending:false})
+        .order('updated_at',{ascending:true})
+        .limit(10);
+    }
     if(result.error)throw result.error;
-    return {online:true,boardKey:key,entries:normalizeRows(result.data)};
+    const entries=normalizeRows((result.data||[]).map(row=>({...row,board_key:key})));
+    let enriched=entries;
+    try{enriched=await replayAvailability(client,key,entries)}catch{}
+    return {online:true,boardKey:key,entries:enriched};
+  }
+
+  async function list(settings={}){
+    return listByKey(boardKey(settings));
+  }
+
+  async function boards(){
+    const client=await getClient();
+    const result=await client
+      .from(TABLE)
+      .select('board_key')
+      .like('board_key','solo|%')
+      .limit(1000);
+    if(result.error)throw result.error;
+    const keys=[...new Set((result.data||[]).map(row=>String(row.board_key||'')).filter(key=>key.startsWith('solo|')))];
+    return keys.sort();
+  }
+
+  async function saveReplay(client,user,key,stamp,replay){
+    const points=normalizeReplayPoints(replay?.route||[]);
+    if(!points.length)return false;
+    const prefix=replayPrefix(key,stamp);
+    const now=new Date(stamp).toISOString();
+    const rows=points.map(point=>({
+      user_id:user.id,
+      player_name:point.name,
+      board_key:`${prefix}${String(point.index).padStart(4,'0')}|${point.lat.toFixed(5)}|${point.lon.toFixed(5)}|${point.countryCode}`,
+      score:point.index,
+      updated_at:now
+    }));
+    const write=await client.from(TABLE).upsert(rows,{onConflict:'user_id,board_key'});
+    if(write.error)throw write.error;
+    return true;
+  }
+
+  async function loadReplay(key,userId,stamp){
+    if(!key||!userId||!stamp)return null;
+    const client=await getClient();
+    const prefix=replayPrefix(key,stamp);
+    const result=await client
+      .from(TABLE)
+      .select('player_name,score,board_key')
+      .eq('user_id',userId)
+      .like('board_key',`${prefix}%`)
+      .order('score',{ascending:true})
+      .limit(500);
+    if(result.error)throw result.error;
+    const points=(result.data||[]).map(row=>{
+      const parsed=parseReplayBoardKey(row.board_key);
+      if(!parsed)return null;
+      return {index:parsed.index,name:cleanName(row.player_name),lat:parsed.lat,lon:parsed.lon,countryCode:parsed.countryCode};
+    }).filter(Boolean).sort((a,b)=>a.index-b.index);
+    if(!points.length)return null;
+    return {boardKey:key,stamp:Number(stamp),points};
   }
 
   async function rankForScore(key,score){
@@ -125,7 +256,7 @@
     return Number(result.count||0)+1;
   }
 
-  async function record({settings,playerName,score,source}={}){
+  async function record({settings,playerName,score,source,replay}={}){
     if(!isEligibleSubmission(settings,source))return {eligible:false,online:true,saved:false,personalBest:false,rank:null,entries:[]};
     const numeric=Math.floor(Number(score));
     if(!Number.isFinite(numeric)||numeric<1)return {eligible:true,online:true,saved:false,personalBest:false,rank:null,entries:(await list(settings)).entries};
@@ -144,9 +275,12 @@
     const previous=existingResult.data||null;
     const personalBest=isPersonalBest(previous?.score,numeric);
     let storedScore=previous?.score==null?numeric:Number(previous.score);
+    let replaySaved=false;
 
     if(personalBest){
-      const now=new Date().toISOString();
+      const now=new Date();
+      const nowIso=now.toISOString();
+      const stamp=now.getTime();
       const write=await client
         .from(TABLE)
         .upsert({
@@ -154,13 +288,15 @@
           player_name:cleanName(playerName),
           board_key:key,
           score:numeric,
-          updated_at:now
+          updated_at:nowIso
         },{onConflict:'user_id,board_key'});
       if(write.error)throw write.error;
       storedScore=numeric;
+      try{replaySaved=await saveReplay(client,user,key,stamp,replay||runtimeReplay())}
+      catch(err){console.warn('Highscore sparades, men omgångens replay kunde inte sparas.',err)}
     }
 
-    const [rank,board]=await Promise.all([rankForScore(key,storedScore),list(settings)]);
+    const [rank,board]=await Promise.all([rankForScore(key,storedScore),listByKey(key)]);
     return {
       eligible:true,
       online:true,
@@ -171,7 +307,8 @@
       submittedScore:numeric,
       rank,
       entries:board.entries,
-      boardKey:key
+      boardKey:key,
+      replaySaved
     };
   }
 
@@ -180,5 +317,5 @@
     return {online:true,count:board.entries.length};
   }
 
-  return Object.freeze({PROJECT_URL,SDK_URL,TABLE,boardKey,normalizeRows,isPersonalBest,isEligibleSubmission,list,record,ping});
+  return Object.freeze({PROJECT_URL,SDK_URL,TABLE,REPLAY_PREFIX,boardKey,boardToken,replayPrefix,parseReplayBoardKey,normalizeReplayPoints,normalizeRows,isPersonalBest,isEligibleSubmission,list,listByKey,boards,loadReplay,record,ping});
 });
