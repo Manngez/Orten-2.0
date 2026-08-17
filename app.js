@@ -33,12 +33,103 @@
     if(localPlayHelp) localPlayHelp.textContent='Turas om på samma mobil, surfplatta eller dator.';
   };
 
+  const REQUIRED_NAME_INPUTS='#playerInputs input,#onlineHostName,#onlineGuestName,#streetDuelName0,#streetDuelName1';
+  const normalizePlayerName=value=>String(value||'').trim().toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/\s+/g,' ');
+  const placeholderPlayerName=value=>/^(?:spelare(?:\s*(?:\d+|ett|tva|tre|fyra|fem|sex))?|player(?:\s*(?:\d+|one|two|three|four|five|six))?|spelledare|host|guest)$/i.test(normalizePlayerName(value));
+  const validPlayerName=value=>!!String(value||'').trim()&&!placeholderPlayerName(value);
+  const cleanPlayerName=value=>String(value||'').replace(/[<>]/g,'').replace(/\s+/g,' ').trim().slice(0,24);
+
+  const installRequiredNames=()=>{
+    if(document.documentElement.dataset.ortenRequiredNames==='1')return;
+    document.documentElement.dataset.ortenRequiredNames='1';
+
+    const style=document.createElement('style');
+    style.textContent=`${REQUIRED_NAME_INPUTS}{transition:border-color .16s,box-shadow .16s}${REQUIRED_NAME_INPUTS}.name-required-field{border-color:#ff8f70!important;box-shadow:0 0 0 3px rgba(255,143,112,.12)!important}`;
+    document.head.appendChild(style);
+
+    try{
+      const stored=localStorage.getItem('orten2:online-name');
+      if(placeholderPlayerName(stored))localStorage.removeItem('orten2:online-name');
+    }catch{}
+    try{
+      if(typeof settings!=='undefined'&&Array.isArray(settings.playerNames))settings.playerNames=settings.playerNames.map(name=>placeholderPlayerName(name)?'':name);
+    }catch{}
+
+    const clearGenericInputs=()=>{
+      document.querySelectorAll(REQUIRED_NAME_INPUTS).forEach(input=>{
+        input.placeholder='Skriv ditt namn';
+        input.autocomplete='name';
+        if(placeholderPlayerName(input.value))input.value='';
+      });
+    };
+    const clearInvalid=input=>{input?.classList.remove('name-required-field');input?.removeAttribute('aria-invalid')};
+    const markInvalid=(input,message)=>{
+      if(input){input.classList.add('name-required-field');input.setAttribute('aria-invalid','true');input.focus();try{input.scrollIntoView({behavior:'smooth',block:'center'})}catch{}}
+      try{if(typeof toast==='function')toast(message,'error',3600)}catch{}
+    };
+    const stop=event=>{event.preventDefault();event.stopPropagation();event.stopImmediatePropagation()};
+
+    document.addEventListener('input',event=>{
+      if(event.target?.matches?.(REQUIRED_NAME_INPUTS))clearInvalid(event.target);
+    },true);
+
+    document.addEventListener('click',event=>{
+      const button=event.target?.closest?.('button');if(!button)return;
+
+      if(button.id==='startButton'){
+        const inputs=[...document.querySelectorAll('#playerInputs input')];
+        let count=inputs.length;
+        try{if(typeof settings!=='undefined')count=Math.max(1,Number(settings.playerCount)||inputs.length)}catch{}
+        const active=inputs.slice(0,count);
+        const invalid=active.find(input=>!validPlayerName(input.value));
+        if(invalid){stop(event);markInvalid(invalid,'Alla spelare måste skriva sitt namn.');return}
+        active.forEach((input,index)=>{
+          const name=cleanPlayerName(input.value);input.value=name;clearInvalid(input);
+          try{if(typeof settings!=='undefined')settings.playerNames[index]=name}catch{}
+        });
+        return;
+      }
+
+      if(button.id==='onlineCreateButton'||button.id==='onlineJoinButton'){
+        const input=document.getElementById(button.id==='onlineCreateButton'?'onlineHostName':'onlineGuestName');
+        if(!input||!validPlayerName(input.value)){
+          stop(event);markInvalid(input,'Du måste skriva ditt namn.');
+          const error=document.getElementById('onlineMenuError');
+          if(error){error.textContent='Du måste skriva ditt namn.';error.classList.remove('hidden')}
+          return;
+        }
+        input.value=cleanPlayerName(input.value);clearInvalid(input);return;
+      }
+
+      if(button.id==='streetDuelStart'){
+        const inputs=[document.getElementById('streetDuelName0'),document.getElementById('streetDuelName1')].filter(Boolean);
+        const invalid=inputs.find(input=>!validPlayerName(input.value));
+        if(invalid){
+          stop(event);markInvalid(invalid,'Båda spelarna måste skriva sitt namn.');
+          const info=document.getElementById('streetDuelLoad');
+          if(info){info.textContent='Skriv namn på båda spelarna för att starta.';info.style.color='#ffb8aa'}
+          return;
+        }
+        inputs.forEach(input=>{input.value=cleanPlayerName(input.value);clearInvalid(input)});
+      }
+    },true);
+
+    const observe=()=>{
+      clearGenericInputs();
+      if(!document.body)return;
+      new MutationObserver(clearGenericInputs).observe(document.body,{childList:true,subtree:true});
+    };
+    if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',observe,{once:true});else observe();
+    clearGenericInputs();
+  };
+
   const schedulePermanentTextOverrides=()=>{
     applyPermanentTextOverrides();
+    installRequiredNames();
     if(document.readyState==='loading'){
-      document.addEventListener('DOMContentLoaded',()=>requestAnimationFrame(applyPermanentTextOverrides),{once:true});
+      document.addEventListener('DOMContentLoaded',()=>requestAnimationFrame(()=>{applyPermanentTextOverrides();installRequiredNames()}),{once:true});
     }else{
-      requestAnimationFrame(applyPermanentTextOverrides);
+      requestAnimationFrame(()=>{applyPermanentTextOverrides();installRequiredNames()});
     }
   };
 
