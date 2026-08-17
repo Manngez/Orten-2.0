@@ -31,6 +31,7 @@ const PRECACHE = [
   './app-search.js',
   './app-ui.js',
   './app-highscore-ui.js',
+  './app-highscore-preview.js',
   './app-online.js',
   './app-online-entry.js',
   './app-street-duel.js',
