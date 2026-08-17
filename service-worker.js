@@ -35,6 +35,7 @@ const PRECACHE = [
   './app-online-entry.js',
   './app-street-duel.js',
   './app-street-duel-timer-options.js',
+  './street-duel-difficulty.js',
   './app-toolbox.js',
   './app-toolbox-selection-guard.js',
   './app-toolbox-mobile.js',
