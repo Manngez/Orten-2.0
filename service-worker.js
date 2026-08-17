@@ -80,6 +80,11 @@ self.addEventListener('fetch', event => {
   const requestUrl = new URL(request.url);
   if (requestUrl.origin !== self.location.origin) return;
 
+  if (requestUrl.pathname.includes('/spelhistorik/')) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
   if (NETWORK_ONLY.some(suffix => requestUrl.pathname.endsWith(suffix))) {
     event.respondWith(fetch(request));
     return;
