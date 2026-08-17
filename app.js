@@ -42,7 +42,7 @@
     }
   };
 
-  const files=['app-core.js','app-setup.js','game-geometry.js','duel-routes.js','street-duel-engine.js','highscore.js','supabase-highscore.js','app-map.js','map-themes.js','app-search.js','app-ui.js','app-highscore-ui.js','app-highscore-preview.js','app-online.js','app-online-entry.js','app-street-duel.js','app-street-duel-timer-options.js','street-duel-difficulty.js'];
+  const files=['app-core.js','app-setup.js','game-geometry.js','duel-routes.js','street-duel-engine.js','highscore.js','supabase-highscore.js','app-map.js','map-themes.js','app-search.js','app-ui.js','app-highscore-ui.js','app-highscore-preview.js','app-highscore-browser.js','app-online.js','app-online-entry.js','app-street-duel.js','app-street-duel-timer-options.js','street-duel-difficulty.js'];
   try{
     const params=new URL(location.href).searchParams;
     if(params.get('verktyg')==='1'||params.get('toolbox')==='1')files.push('app-toolbox.js','app-toolbox-selection-guard.js','app-toolbox-mobile.js');
