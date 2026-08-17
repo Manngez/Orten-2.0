@@ -4,6 +4,83 @@
   let BUILD='dev';
   try{BUILD=new URL(currentSrc,location.href).searchParams.get('v') || 'dev';}catch{}
 
+  const installSupabaseReliability=()=>{
+    if(window.__ortenSupabaseReliabilityInstalled)return;
+    window.__ortenSupabaseReliabilityInstalled=true;
+    const projectHost='mewauzsogkbcchnvsath.supabase.co';
+    const nativeFetch=typeof window.fetch==='function'?window.fetch.bind(window):null;
+
+    if(nativeFetch){
+      window.fetch=(input,init)=>{
+        let url='';
+        try{url=typeof input==='string'?input:(input?.url||String(input||''))}catch{}
+        if(!url.includes(projectHost))return nativeFetch(input,init);
+
+        const controller=new AbortController();
+        let sourceSignal=null;
+        try{sourceSignal=init?.signal||((typeof Request!=='undefined'&&input instanceof Request)?input.signal:null)}catch{}
+        const relayAbort=()=>{try{controller.abort(sourceSignal?.reason)}catch{try{controller.abort()}catch{}}};
+        if(sourceSignal){
+          if(sourceSignal.aborted)relayAbort();
+          else sourceSignal.addEventListener('abort',relayAbort,{once:true});
+        }
+        const timer=setTimeout(()=>{try{controller.abort(new Error('Supabase-anropet tog för lång tid.'))}catch{try{controller.abort()}catch{}}},15000);
+        const nextInit={...(init||{}),signal:controller.signal};
+        return nativeFetch(input,nextInit).finally(()=>{
+          clearTimeout(timer);
+          try{sourceSignal?.removeEventListener('abort',relayAbort)}catch{}
+        });
+      };
+    }
+
+    const watchSdkScript=script=>{
+      if(!script||script.dataset?.ortenSupabaseWatchdog==='1')return;
+      script.dataset.ortenSupabaseWatchdog='1';
+      let settled=false;
+      const finish=()=>{settled=true;clearTimeout(timer)};
+      const timer=setTimeout(()=>{
+        if(settled||window.supabase?.createClient)return;
+        try{script.dispatchEvent(new Event('error'))}catch{}
+        setTimeout(()=>{try{if(!window.supabase?.createClient)script.remove()}catch{}},0);
+      },12000);
+      script.addEventListener('load',finish,{once:true});
+      script.addEventListener('error',finish,{once:true});
+    };
+
+    document.querySelectorAll('script[data-orten-supabase-sdk]').forEach(watchSdkScript);
+    new MutationObserver(records=>{
+      for(const record of records){
+        for(const node of record.addedNodes){
+          if(node?.nodeType!==1)continue;
+          if(node.matches?.('script[data-orten-supabase-sdk]'))watchSdkScript(node);
+          node.querySelectorAll?.('script[data-orten-supabase-sdk]').forEach(watchSdkScript);
+        }
+      }
+    }).observe(document.documentElement,{childList:true,subtree:true});
+
+    const recoverStuckHistoryLoader=()=>{
+      const body=document.getElementById('privateHistoryBody');
+      const loading=body?.querySelector?.('.private-history-loading');
+      if(!body||!loading){if(body)delete body.dataset.ortenHistoryLoadingSince;return}
+      const now=Date.now();
+      let started=Number(body.dataset.ortenHistoryLoadingSince)||0;
+      if(!started){started=now;body.dataset.ortenHistoryLoadingSince=String(now);return}
+      if(now-started<22000)return;
+      body.dataset.ortenHistoryLoadingSince=String(now+3600000);
+      body.innerHTML='<span class="step-kicker">🔐 PRIVAT ADMINVY</span><h2>Spelomgångar · senaste 48 h</h2><div class="private-history-empty"><strong>Hämtningen tog för lång tid.</strong><br>Anslutningen har avbrutits så att adminvyn inte fastnar. Försök igen.</div><div class="private-history-toolbar"><button id="privateHistoryStuckRetry" class="ghost-button" type="button">↻ Försök igen</button></div>';
+      document.getElementById('privateHistoryStuckRetry')?.addEventListener('click',()=>{
+        delete body.dataset.ortenHistoryLoadingSince;
+        const sdk=document.querySelector('script[data-orten-supabase-sdk]');
+        if(sdk&&!window.supabase?.createClient){try{sdk.dispatchEvent(new Event('error'));sdk.remove()}catch{}}
+        const modal=document.getElementById('privateHistoryModal');
+        if(modal)modal.classList.add('hidden');
+        setTimeout(()=>document.getElementById('privateHistoryButton')?.click(),80);
+      });
+    };
+    setInterval(recoverStuckHistoryLoader,500);
+  };
+  installSupabaseReliability();
+
   const NativeWorker=window.Worker;
   if(NativeWorker){
     const VersionedWorker=function(url,options){
