@@ -78,7 +78,11 @@
     if(settings.scope==='world')return 'WORLD';
     if(settings.scope==='country')return token(String(settings.country||'LAND').toUpperCase(),16);
     if(settings.scope==='continent')return token(String(settings.continent||'CONTINENT').toUpperCase(),18);
-    if(settings.scope==='custom')return 'CUSTOM';
+    if(settings.scope==='custom'){
+      const countries=[...(settings.countries||[])].map(code=>String(code).toUpperCase()).sort();
+      if(countries.join(',')==='DK,FI,IS,NO,SE')return 'NORDIC';
+      return 'CUSTOM';
+    }
     return token(String(settings.scope||'AREA').toUpperCase(),18);
   }
 
@@ -120,7 +124,7 @@
     const players=(()=>{try{return (game.players||[]).map(player=>({name:clean(player?.name||'Spelare'),strikes:Number(player?.strikes)||0,score:Number(player?.score)||0}))}catch{return []}})();
     return {
       kind:'orten',completedAt:Date.now(),startedAt:Number(regularTrack?.startedAt)||Date.now(),roomCode:roomCode(),
-      settings:{mode:String(game?.settings?.mode||''),scope:String(game?.settings?.scope||''),continent:String(game?.settings?.continent||''),country:String(game?.settings?.country||'')},
+      settings:{mode:String(game?.settings?.mode||''),scope:String(game?.settings?.scope||''),continent:String(game?.settings?.continent||''),country:String(game?.settings?.country||''),countries:[...(game?.settings?.countries||[])].map(String)},
       players,totalMoves:Number(game?.totalMoves)||regularTrack?.rounds?.reduce((sum,r)=>sum+(r.route?.length||0),0)||0,
       rounds:[...(regularTrack?.rounds||[])].sort((a,b)=>a.round-b.round)
     };
@@ -183,20 +187,20 @@
     const rows=[{
       user_id:userId,
       player_name:clean(players[0]?.name||'Spelare'),
-      board_key:`game|1|${stamp}|${id}|${mode}|${area}|${room}`,
+      board_key:`replay|game|1|${stamp}|${id}|${mode}|${area}|${room}`,
       score:Math.max(1,Math.floor(Number(snapshot.totalMoves)||0)),
       updated_at:iso
     }];
 
     players.slice(0,8).forEach((player,index)=>{
       const stat=Number.isFinite(Number(player.score))&&Number(player.score)>0?`s${Math.floor(Number(player.score))}`:`k${Math.floor(Number(player.strikes)||0)}`;
-      rows.push({user_id:userId,player_name:clean(player.name||`Spelare ${index+1}`),board_key:`gplayer|1|${id}|${String(index).padStart(2,'0')}|${stat}`,score:index+1,updated_at:iso});
+      rows.push({user_id:userId,player_name:clean(player.name||`Spelare ${index+1}`),board_key:`replay|player|1|${id}|${String(index).padStart(2,'0')}|${stat}`,score:index+1,updated_at:iso});
     });
 
     if(snapshot.kind==='street'){
       for(const round of snapshot.rounds||[]){
         const scoreToken=`${Math.floor(Number(round.scores?.[0])||0)}-${Math.floor(Number(round.scores?.[1])||0)}`;
-        (round.used||[]).slice(0,200).forEach((name,index)=>rows.push({user_id:userId,player_name:clean(name),board_key:`gst|1|${id}|${Math.floor(Number(round.round)||1)}|${String(index+1).padStart(3,'0')}|${scoreToken}`,score:index+1,updated_at:iso}));
+        (round.used||[]).slice(0,200).forEach((name,index)=>rows.push({user_id:userId,player_name:clean(name),board_key:`replay|street|1|${id}|${Math.floor(Number(round.round)||1)}|${String(index+1).padStart(3,'0')}|${scoreToken}`,score:index+1,updated_at:iso}));
       }
       return rows;
     }
@@ -206,9 +210,9 @@
       for(const point of round.route||[]){
         if(pointCount>=ROUTE_LIMIT)break;
         pointCount++;
-        rows.push({user_id:userId,player_name:clean(point.name),board_key:`gpt|1|${id}|${Math.floor(Number(round.round)||1)}|${String(point.index||pointCount).padStart(3,'0')}|${Number(point.lat).toFixed(5)}|${Number(point.lon).toFixed(5)}|${Math.max(0,Math.floor(Number(point.playerIndex)||0))}|${token(point.countryCode||'-',3)}`,score:point.index||pointCount,updated_at:iso});
+        rows.push({user_id:userId,player_name:clean(point.name),board_key:`replay|pt|1|${id}|${Math.floor(Number(round.round)||1)}|${String(point.index||pointCount).padStart(3,'0')}|${Number(point.lat).toFixed(5)}|${Number(point.lon).toFixed(5)}|${Math.max(0,Math.floor(Number(point.playerIndex)||0))}|${token(point.countryCode||'-',3)}`,score:point.index||pointCount,updated_at:iso});
       }
-      (round.crossings||[]).slice(0,20).forEach((crossing,index)=>rows.push({user_id:userId,player_name:'Korsning',board_key:`gx|1|${id}|${Math.floor(Number(round.round)||1)}|${String(index+1).padStart(2,'0')}|${Number(crossing.lat).toFixed(5)}|${Number(crossing.lon).toFixed(5)}`,score:index+1,updated_at:iso}));
+      (round.crossings||[]).slice(0,20).forEach((crossing,index)=>rows.push({user_id:userId,player_name:'Korsning',board_key:`replay|x|1|${id}|${Math.floor(Number(round.round)||1)}|${String(index+1).padStart(2,'0')}|${Number(crossing.lat).toFixed(5)}|${Number(crossing.lon).toFixed(5)}`,score:index+1,updated_at:iso}));
       if(pointCount>=ROUTE_LIMIT)break;
     }
     return rows;
