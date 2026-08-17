@@ -16,38 +16,38 @@
 
   function parseSummary(row){
     const parts=String(row?.board_key||'').split('|');
-    if(parts.length!==7||parts[0]!=='game'||parts[1]!=='1')return null;
-    const stamp=Number(parts[2]),score=Math.floor(Number(row.score)||0);
+    if(parts.length!==8||parts[0]!=='replay'||parts[1]!=='game'||parts[2]!=='1')return null;
+    const stamp=Number(parts[3]),score=Math.floor(Number(row.score)||0);
     if(!Number.isFinite(stamp)||stamp<1)return null;
-    return {id:parts[3],stamp,mode:parts[4],area:parts[5],room:parts[6]==='-'?'':parts[6],firstPlayer:String(row.player_name||''),score,updatedAt:row.updated_at?Date.parse(row.updated_at):stamp};
+    return {id:parts[4],stamp,mode:parts[5],area:parts[6],room:parts[7]==='-'?'':parts[7],firstPlayer:String(row.player_name||''),score,updatedAt:row.updated_at?Date.parse(row.updated_at):stamp};
   }
 
   function parsePlayer(row){
     const parts=String(row?.board_key||'').split('|');
-    if(parts.length!==5||parts[0]!=='gplayer'||parts[1]!=='1')return null;
-    return {id:parts[2],index:Number(parts[3])||0,stat:parts[4],name:String(row.player_name||'Spelare')};
+    if(parts.length!==6||parts[0]!=='replay'||parts[1]!=='player'||parts[2]!=='1')return null;
+    return {id:parts[3],index:Number(parts[4])||0,stat:parts[5],name:String(row.player_name||'Spelare')};
   }
 
   function parsePoint(row){
     const parts=String(row?.board_key||'').split('|');
-    if(parts.length!==9||parts[0]!=='gpt'||parts[1]!=='1')return null;
-    const round=Number(parts[3]),index=Number(parts[4]),lat=Number(parts[5]),lon=Number(parts[6]),playerIndex=Number(parts[7]);
+    if(parts.length!==10||parts[0]!=='replay'||parts[1]!=='pt'||parts[2]!=='1')return null;
+    const round=Number(parts[4]),index=Number(parts[5]),lat=Number(parts[6]),lon=Number(parts[7]),playerIndex=Number(parts[8]);
     if(!Number.isFinite(round)||!Number.isFinite(index)||!Number.isFinite(lat)||!Number.isFinite(lon))return null;
-    return {id:parts[2],round,index,lat,lon,playerIndex:Number.isFinite(playerIndex)?playerIndex:0,countryCode:parts[8]==='-'?'':parts[8],name:String(row.player_name||`Ort ${index}`)};
+    return {id:parts[3],round,index,lat,lon,playerIndex:Number.isFinite(playerIndex)?playerIndex:0,countryCode:parts[9]==='-'?'':parts[9],name:String(row.player_name||`Ort ${index}`)};
   }
 
   function parseCrossing(row){
     const parts=String(row?.board_key||'').split('|');
-    if(parts.length!==7||parts[0]!=='gx'||parts[1]!=='1')return null;
-    const round=Number(parts[3]),index=Number(parts[4]),lat=Number(parts[5]),lon=Number(parts[6]);
+    if(parts.length!==8||parts[0]!=='replay'||parts[1]!=='x'||parts[2]!=='1')return null;
+    const round=Number(parts[4]),index=Number(parts[5]),lat=Number(parts[6]),lon=Number(parts[7]);
     if(!Number.isFinite(round)||!Number.isFinite(index)||!Number.isFinite(lat)||!Number.isFinite(lon))return null;
-    return {id:parts[2],round,index,lat,lon};
+    return {id:parts[3],round,index,lat,lon};
   }
 
   function parseStreet(row){
     const parts=String(row?.board_key||'').split('|');
-    if(parts.length!==6||parts[0]!=='gst'||parts[1]!=='1')return null;
-    return {id:parts[2],round:Number(parts[3])||1,index:Number(parts[4])||1,scores:parts[5],name:String(row.player_name||'Gata')};
+    if(parts.length!==7||parts[0]!=='replay'||parts[1]!=='street'||parts[2]!=='1')return null;
+    return {id:parts[3],round:Number(parts[4])||1,index:Number(parts[5])||1,scores:parts[6],name:String(row.player_name||'Gata')};
   }
 
   function modeText(mode){return ({classic:'⚡ Klassisk',endurance:'🛡️ Tålighet',elimination:'🏆 Utslagning',duel:'⚔️ Duell',solo:'🧭 Solo',street:'🏙️ Gatduell'})[mode]||mode||'Orten'}
@@ -65,8 +65,8 @@
     $('list').innerHTML='';
     try{
       const [summaryResult,playerResult]=await Promise.all([
-        client.from(TABLE).select('player_name,score,updated_at,board_key').like('board_key','game|1|%').order('updated_at',{ascending:false}).limit(1500),
-        client.from(TABLE).select('player_name,board_key').like('board_key','gplayer|1|%').limit(10000)
+        client.from(TABLE).select('player_name,score,updated_at,board_key').like('board_key','replay|game|1|%').order('updated_at',{ascending:false}).limit(1500),
+        client.from(TABLE).select('player_name,board_key').like('board_key','replay|player|1|%').limit(10000)
       ]);
       if(summaryResult.error)throw summaryResult.error;
       if(playerResult.error)throw playerResult.error;
@@ -106,10 +106,10 @@
 
   async function loadGameRows(id){
     const [pointsResult,crossResult,streetResult,playersResult]=await Promise.all([
-      client.from(TABLE).select('player_name,score,board_key').like('board_key',`gpt|1|${id}|%`).limit(2500),
-      client.from(TABLE).select('player_name,score,board_key').like('board_key',`gx|1|${id}|%`).limit(300),
-      client.from(TABLE).select('player_name,score,board_key').like('board_key',`gst|1|${id}|%`).limit(1500),
-      client.from(TABLE).select('player_name,score,board_key').like('board_key',`gplayer|1|${id}|%`).limit(20)
+      client.from(TABLE).select('player_name,score,board_key').like('board_key',`replay|pt|1|${id}|%`).limit(2500),
+      client.from(TABLE).select('player_name,score,board_key').like('board_key',`replay|x|1|${id}|%`).limit(300),
+      client.from(TABLE).select('player_name,score,board_key').like('board_key',`replay|street|1|${id}|%`).limit(1500),
+      client.from(TABLE).select('player_name,score,board_key').like('board_key',`replay|player|1|${id}|%`).limit(20)
     ]);
     for(const result of [pointsResult,crossResult,streetResult,playersResult])if(result.error)throw result.error;
     const unique=(rows,parser,keyFn)=>{
