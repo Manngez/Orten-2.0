@@ -55,7 +55,7 @@ test('treats named approaches around the same roundabout as connected streets',(
 
 test('does not join two nearby dead ends just because they are close',()=>{
   const nearMiss=E.buildGraph([
-    feature('Första vägen',[[20.20,63.82],[20.2000,63.8200]]),
+    feature('Första vägen',[[20.1980,63.8200],[20.2000,63.8200]]),
     feature('Andra vägen',[[20.20025,63.8200],[20.2020,63.8200]])
   ],{bbox,toleranceMeters:3,junctionRadiusMeters:25});
   assert.equal(nearMiss.crosses('Första vägen','Andra vägen'),false);
