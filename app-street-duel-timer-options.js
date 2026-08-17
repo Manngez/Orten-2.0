@@ -119,7 +119,10 @@
   function bootstrap(){
     syncAll();
     observer=new MutationObserver(()=>queueMicrotask(syncAll));
-    observer.observe(document.body,{childList:true,subtree:true,characterData:true});
+    const card=document.getElementById('streetDuelOverlayCard');
+    const timerText=document.getElementById('streetDuelTimerText');
+    if(card) observer.observe(card,{childList:true,subtree:true,characterData:true});
+    if(timerText) observer.observe(timerText,{childList:true,subtree:true,characterData:true});
   }
 
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',bootstrap,{once:true});
