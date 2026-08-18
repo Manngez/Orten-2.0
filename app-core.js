@@ -46,16 +46,12 @@
     $(`${name}Screen`)?.classList.add('active');
   }
 
-  function initEls(){
-    ['soundButton','howToButton','presetGrid','modeGrid','scopeCount','scopeTabs','continentBox','continentSelect','countryBox','countrySelect','customBox','countrySearch','clearCountriesButton','countryChips','placeTypeOptions','themeGrid','autoFollowToggle','labelsToggle','playerCountSelect','playerInputs','strikeCard','strikeLimitSelect','timerSelect','duplicateSelect','summaryRows','startButton','gameScreen','exitGameButton','pauseButton','scopeBadge','modeBadge','turnDot','currentPlayerName','turnSubtext','timerWrap','timerBar','timerText','scoreboard','routeCount','routeList','map','zoomInButton','zoomOutButton','latestButton','fitButton','followButton','fullscreenButton','mapInteractionHint','crossBanner','crossBannerText','inputScopeText','placeForm','placeInput','playButton','searchState','recentChoices','restartButton','placeModal','placeModalClose','placeModalTitle','placeModalText','placeChoices','resultModal','resultIcon','resultTitle','resultText','resultStats','continueButton','playAgainButton','changeSettingsButton','pauseModal','resumeButton','howToModal','howToClose','toast'].forEach(id => els[id] = $(id));
-  }
-
   function ensureDuelModeControls(){
-    if(els.modeGrid && !els.modeGrid.querySelector('[data-mode="duel"]')){
-      const b=document.createElement('button');b.type='button';b.className='mode-card';b.dataset.mode='duel';
-      b.innerHTML='<span class="mode-icon">⚔️</span><strong>Duell</strong><small>Två spelare bygger varsin separat linje.</small>';
-      const solo=els.modeGrid.querySelector('[data-mode="solo"]');els.modeGrid.insertBefore(b,solo||null);
-    }
+    // Huvudmenyn ska vara enkel: Klassisk, Tålighet och Solo.
+    // Äldre speciallägen finns kvar i spelmotorn för historik/bakåtkompatibilitet,
+    // men visas inte längre som primära spellägen.
+    els.modeGrid?.querySelector('[data-mode="elimination"]')?.remove();
+    els.modeGrid?.querySelector('[data-mode="duel"]')?.remove();
     if(els.strikeLimitSelect && !els.strikeLimitSelect.querySelector('option[value="1"]')){
       const option=new Option('1 korsning','1');els.strikeLimitSelect.insertBefore(option,els.strikeLimitSelect.firstChild);
     }
@@ -122,16 +118,16 @@
   }
 
   function normalizePlayerCount(){
+    // Gamla Utslagning/Duell-inställningar landar tryggt i Klassisk i den nya förenklade menyn.
+    if(settings.mode==='elimination'||settings.mode==='duel') settings.mode='classic';
     if(settings.mode==='solo') settings.playerCount=1;
-    else if(settings.mode==='duel') settings.playerCount=2;
-    else if(settings.mode==='elimination') settings.playerCount=clamp(settings.playerCount,3,6);
     else settings.playerCount=clamp(settings.playerCount,2,6);
   }
 
   function renderPlayerCount(){
     const select=els.playerCountSelect; const old=settings.playerCount; select.innerHTML='';
-    const min=settings.mode==='solo'?1:(settings.mode==='duel'?2:(settings.mode==='elimination'?3:2));
-    const max=settings.mode==='solo'?1:(settings.mode==='duel'?2:6);
+    const min=settings.mode==='solo'?1:2;
+    const max=settings.mode==='solo'?1:6;
     for(let i=min;i<=max;i++) select.add(new Option(`${i} spelare`,String(i)));
     settings.playerCount=clamp(old,min,max); select.value=String(settings.playerCount);
   }
@@ -198,10 +194,10 @@
     els.themeGrid.querySelectorAll('[data-theme]').forEach(b=>b.classList.toggle('selected',b.dataset.theme===settings.mapTheme));
     els.autoFollowToggle.checked=settings.autoFollow; els.labelsToggle.checked=settings.labels;
     renderPlayerCount(); renderPlayerInputs();
-    const usesStrikes=settings.mode==='endurance'||settings.mode==='duel';
+    const usesStrikes=settings.mode==='endurance';
     els.strikeCard.classList.toggle('hidden',!usesStrikes);
-    const strikeLabel=els.strikeCard.querySelector('label');if(strikeLabel)strikeLabel.textContent=settings.mode==='duel'?'Egna korsningar innan förlust':'Korsningar innan förlust';
-    const strikeHelp=els.strikeCard.querySelector('small');if(strikeHelp)strikeHelp.textContent=settings.mode==='duel'?'Bara korsningar med din egen linje räknas.':'Visas bara i Tålighet.';
+    const strikeLabel=els.strikeCard.querySelector('label');if(strikeLabel)strikeLabel.textContent='Korsningar innan förlust';
+    const strikeHelp=els.strikeCard.querySelector('small');if(strikeHelp)strikeHelp.textContent='Visas bara i Tålighet.';
     els.strikeLimitSelect.value=String(settings.strikeLimit); els.timerSelect.value=String(settings.timer); els.duplicateSelect.value=settings.duplicatePolicy;
     updateSummary();
   }
