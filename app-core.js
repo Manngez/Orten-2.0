@@ -46,6 +46,10 @@
     $(`${name}Screen`)?.classList.add('active');
   }
 
+  function initEls(){
+    ['soundButton','howToButton','presetGrid','modeGrid','scopeCount','scopeTabs','continentBox','continentSelect','countryBox','countrySelect','customBox','countrySearch','clearCountriesButton','countryChips','placeTypeOptions','themeGrid','autoFollowToggle','labelsToggle','playerCountSelect','playerInputs','strikeCard','strikeLimitSelect','timerSelect','duplicateSelect','summaryRows','startButton','gameScreen','exitGameButton','pauseButton','scopeBadge','modeBadge','turnDot','currentPlayerName','turnSubtext','timerWrap','timerBar','timerText','scoreboard','routeCount','routeList','map','zoomInButton','zoomOutButton','latestButton','fitButton','followButton','fullscreenButton','mapInteractionHint','crossBanner','crossBannerText','inputScopeText','placeForm','placeInput','playButton','searchState','recentChoices','restartButton','placeModal','placeModalClose','placeModalTitle','placeModalText','placeChoices','resultModal','resultIcon','resultTitle','resultText','resultStats','continueButton','playAgainButton','changeSettingsButton','pauseModal','resumeButton','howToModal','howToClose','toast'].forEach(id => els[id] = $(id));
+  }
+
   function ensureDuelModeControls(){
     // Huvudmenyn ska vara enkel: Klassisk, Tålighet och Solo.
     // Äldre speciallägen finns kvar i spelmotorn för historik/bakåtkompatibilitet,
