@@ -9,21 +9,21 @@
     const style=document.createElement('style');
     style.id=STYLE_ID;
     style.textContent=`
-      /* START: endast huvudvalen plus en diskret highscoregenväg. */
+      /* START: huvudvalen plus diskreta hjälpgenvägar. */
       .orten-entry-gate #soundButton,
-      .orten-entry-gate #howToButton,
       .orten-entry-gate .simple-step-guide{display:none!important}
 
-      /* Highscore ska alltid gå att nå utan att bli ett huvudval. */
-      #setupScreen #highscoreButton{min-height:36px!important;padding:0 11px!important;border-radius:11px!important;font-size:11px!important;font-weight:850!important;opacity:.82!important}
-      #setupScreen #highscoreButton:hover,#setupScreen #highscoreButton:focus-visible{opacity:1!important}
+      /* Highscore och Så spelar du ska alltid gå att nå utan att bli huvudval. */
+      #setupScreen #highscoreButton,
+      #setupScreen #howToButton{min-height:36px!important;padding:0 11px!important;border-radius:11px!important;font-size:11px!important;font-weight:850!important;opacity:.82!important}
+      #setupScreen #highscoreButton:hover,#setupScreen #highscoreButton:focus-visible,
+      #setupScreen #howToButton:hover,#setupScreen #howToButton:focus-visible{opacity:1!important}
 
       /* INSTÄLLNINGAR: ta bort allt som inte hjälper nästa beslut. */
       #setupScreen:not(.orten-entry-gate) > .hero,
       #setupScreen:not(.orten-entry-gate) > .footer,
       #setupScreen:not(.orten-entry-gate) #onlineButton,
-      #setupScreen:not(.orten-entry-gate) #soundButton,
-      #setupScreen:not(.orten-entry-gate) #howToButton{display:none!important}
+      #setupScreen:not(.orten-entry-gate) #soundButton{display:none!important}
       #setupScreen:not(.orten-entry-gate) .setup-grid{grid-template-columns:minmax(0,760px)!important;justify-content:center;gap:8px!important}
       #setupScreen:not(.orten-entry-gate) .setup-main{min-width:0}
       #setupScreen:not(.orten-entry-gate) .setup-main > .panel{border-radius:18px!important;padding:18px!important}
@@ -101,7 +101,8 @@
       @media(max-width:720px){
         #setupScreen:not(.orten-entry-gate) .topbar{min-height:48px!important;padding-top:6px!important;padding-bottom:4px!important}
         #setupScreen:not(.orten-entry-gate) .brand-logo{max-height:30px!important}
-        #setupScreen #highscoreButton{min-height:34px!important;padding:0 9px!important;font-size:10px!important}
+        #setupScreen #highscoreButton,
+        #setupScreen #howToButton{min-height:34px!important;padding:0 9px!important;font-size:10px!important}
         #modeGrid.mode-grid,#setupScreen.online-host-mode #modeGrid.mode-grid{grid-template-columns:1fr!important}
         #modeGrid .mode-card{min-height:88px!important;display:grid!important;grid-template-columns:42px 1fr!important;grid-template-rows:auto auto!important;column-gap:12px!important;align-items:center!important;text-align:left!important}
         #modeGrid .mode-icon{grid-row:1/3!important;margin:0!important}
