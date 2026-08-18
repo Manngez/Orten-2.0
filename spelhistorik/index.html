@@ -12,7 +12,33 @@
 <body>
   <main class="wrap">
     <section id="historyView">
-      <header class="top"><div><span class="eyebrow">ORTEN 2.0 · INTERN VY</span><h1>Spelhistorik</h1><p>Genomförda matcher, spelare, resultat och sparade rutter.</p></div><button id="refresh" class="refresh" type="button">↻ Uppdatera</button></header>
+      <header class="top">
+        <div><span class="eyebrow">ORTEN 2.0 · INTERN VY</span><h1>Spelhistorik</h1><p>Genomförda matcher, spelare, resultat och sparade rutter.</p></div>
+        <button id="refresh" class="refresh" type="button">↻ Uppdatera</button>
+      </header>
+
+      <section class="filters" aria-label="Filtrera spelhistorik">
+        <label><span>Spelläge</span><select id="modeFilter">
+          <option value="all">Alla spellägen</option>
+          <option value="classic">Klassisk</option>
+          <option value="endurance">Tålighet</option>
+          <option value="elimination">Utslagning</option>
+          <option value="duel">Duell</option>
+          <option value="solo">Solo</option>
+          <option value="street">Gatduell</option>
+        </select></label>
+        <label><span>Period</span><select id="periodFilter">
+          <option value="all">Alla datum</option>
+          <option value="today">Idag</option>
+          <option value="24h">Senaste 24 timmarna</option>
+          <option value="7d">Senaste 7 dagarna</option>
+          <option value="30d">Senaste 30 dagarna</option>
+        </select></label>
+        <label><span>Specifikt datum</span><input id="dateFilter" type="date"></label>
+        <button id="clearFilters" class="clear-filters" type="button">Rensa filter</button>
+      </section>
+
+      <div class="history-meta"><span id="filterCount">0 spel</span></div>
       <div id="status" class="status loading">Hämtar spelhistorik…</div>
       <div id="list" class="history-list"></div>
     </section>
