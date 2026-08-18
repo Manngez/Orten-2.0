@@ -133,6 +133,10 @@
     };
   }
 
+  function regularHasCrossing(snapshot){
+    return !!(snapshot?.kind==='orten'&&(snapshot.rounds||[]).some(round=>Array.isArray(round?.crossings)&&round.crossings.length>0));
+  }
+
   function streetDom(){
     const screen=byId('streetDuelScreen');if(!screen)return {active:false};
     const active=screen.classList.contains('active');
@@ -218,12 +222,13 @@
     try{
       const now=Date.now(),raw=JSON.parse(localStorage.getItem(PENDING_KEY)||'[]');
       if(!Array.isArray(raw))return [];
-      return raw.filter(item=>item&&item.snapshot&&now-Number(item.queuedAt||item.snapshot.completedAt||now)<PENDING_MAX_AGE).slice(-PENDING_MAX);
+      return raw.filter(item=>item&&item.snapshot&&now-Number(item.queuedAt||item.snapshot.completedAt||now)<PENDING_MAX_AGE&&(item.snapshot.kind!=='orten'||regularHasCrossing(item.snapshot))).slice(-PENDING_MAX);
     }catch{return []}
   }
   function writePending(items){try{localStorage.setItem(PENDING_KEY,JSON.stringify(items.slice(-PENDING_MAX)))}catch{}}
   function queueSnapshot(snapshot){
     if(!snapshot||Number(snapshot.totalMoves)<1)return null;
+    if(snapshot.kind==='orten'&&!regularHasCrossing(snapshot))return null;
     const key=`${Math.floor(Number(snapshot.completedAt)||Date.now())}-${quickHash(fingerprint(snapshot))}`;
     const items=readPending();
     if(!items.some(item=>item.key===key))items.push({key,queuedAt:Date.now(),snapshot});
@@ -233,6 +238,7 @@
   function removePending(key){const items=readPending().filter(item=>item.key!==key);writePending(items)}
 
   async function saveSnapshot(snapshot){
+    if(snapshot?.kind==='orten'&&!regularHasCrossing(snapshot))return null;
     const client=await getClient(),user=await ensureUser(),id=await gameId(snapshot),rows=gameRows(snapshot,id,user.id);
     for(let i=0;i<rows.length;i+=400){
       const result=await client.from(TABLE).upsert(rows.slice(i,i+400),{onConflict:'user_id,board_key'});
@@ -256,8 +262,10 @@
   function finalizeRegular(){
     if(!regularTrack)startRegular();
     if(regularTrack.finalized)return;
+    const finalRound=currentRound();
+    if(!finalRound.crossings.length)return;
     const snapshot=regularSnapshot(Date.now());
-    if(Number(snapshot.totalMoves)<1)return;
+    if(Number(snapshot.totalMoves)<1||!regularHasCrossing(snapshot))return;
     regularTrack.finalized=true;
     queueSnapshot(snapshot);
     void flushPending();
