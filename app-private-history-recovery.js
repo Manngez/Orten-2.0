@@ -2,6 +2,7 @@
 
 (() => {
   const STYLE_ID='orten-simple-flow-style';
+  let refreshQueued=false;
 
   function installStyles(){
     if(document.getElementById(STYLE_ID))return;
@@ -12,6 +13,7 @@
       .orten-entry-gate #highscoreButton,
       .orten-entry-gate #soundButton,
       .orten-entry-gate #howToButton{display:none!important}
+      .orten-entry-gate .simple-step-guide{display:none!important}
 
       /* Efter första valet försvinner marknadsföringsytor och extra brus. */
       #setupScreen:not(.orten-entry-gate) > .hero,
@@ -87,7 +89,6 @@
     const guide=document.createElement('div');
     guide.id='simpleStepGuide';
     guide.className='simple-step-guide';
-    guide.innerHTML='<b>1</b><div><strong>Välj spelläge</strong><small>Tryck på ett alternativ. Du går vidare automatiskt.</small></div>';
     nav.insertAdjacentElement('afterend',guide);
   }
 
@@ -109,12 +110,12 @@
     });
   }
 
+  function setText(el,text){if(el&&el.textContent!==text)el.textContent=text}
+
   function updateInstruction(){
     const screen=document.getElementById('setupScreen');
     const guide=document.getElementById('simpleStepGuide');
     if(!screen||!guide)return;
-    if(screen.classList.contains('orten-entry-gate')){guide.style.display='none';return}
-    guide.style.display='flex';
     const step=Number(screen.dataset.setupStep)||1;
     const host=screen.classList.contains('online-host-mode');
     const copy=host
@@ -129,51 +130,60 @@
           3:['Skriv namn och starta','Skriv spelarnas namn. Turtid är valfri. Tryck sedan på Starta spelet.']
         };
     const [title,text]=copy[step]||copy[1];
-    guide.innerHTML=`<b>${step}</b><div><strong>${title}</strong><small>${text}</small></div>`;
-
-    const labels=[['Spelläge','Spelläge'],['Område','Område'],['Namn & start','Namn & start']];
-    document.querySelectorAll('[data-wizard-dot]').forEach((dot,index)=>{
-      const small=dot.querySelector('small');if(small&&labels[index])small.textContent=labels[index][1];
-    });
-    const stepText=document.getElementById('setupStepText');if(stepText)stepText.textContent=`Steg ${step} av 3`;
-
-    const heading=setupPanel(step)?.querySelector('.panel-heading h2');
-    if(heading){
-      if(step===1)heading.textContent='Välj ett spelläge';
-      else if(step===2)heading.textContent='Välj område';
-      else heading.textContent=host?'Sista steget':'Skriv namn och starta';
+    const key=`${host?'host':'local'}:${step}:${title}:${text}`;
+    if(guide.dataset.copyKey!==key){
+      guide.dataset.copyKey=key;
+      guide.innerHTML=`<b>${step}</b><div><strong>${title}</strong><small>${text}</small></div>`;
     }
 
-    const back=document.querySelector('#setupEntryBack button');
-    if(back)back.textContent='← Start';
-    const hostBack=document.getElementById('onlineHostBack');
-    if(hostBack)hostBack.textContent='← Till onlinevalet';
+    const labels=['Spelläge','Område','Namn & start'];
+    document.querySelectorAll('[data-wizard-dot]').forEach((dot,index)=>setText(dot.querySelector('small'),labels[index]||''));
+    setText(document.getElementById('setupStepText'),`Steg ${step} av 3`);
+
+    const heading=setupPanel(step)?.querySelector('.panel-heading h2');
+    if(step===1)setText(heading,'Välj ett spelläge');
+    else if(step===2)setText(heading,'Välj område');
+    else setText(heading,host?'Sista steget':'Skriv namn och starta');
+
+    setText(document.querySelector('#setupEntryBack button'),'← Start');
+    setText(document.getElementById('onlineHostBack'),'← Till onlinevalet');
 
     const timer=document.getElementById('timerSelect')?.closest('.field-card');
-    if(timer)timer.classList.toggle('hidden',!host&&settings?.mode==='solo');
+    if(timer)timer.classList.toggle('hidden',!host&&typeof settings!=='undefined'&&settings?.mode==='solo');
   }
 
   function simplifyOnlineModal(){
     const body=document.getElementById('onlineModalBody');if(!body)return;
     const title=body.querySelector('h2');
     const intro=body.querySelector('.online-intro');
-    if(title&&title.textContent.includes('Spela Orten tillsammans'))title.textContent='Online';
-    if(intro)intro.textContent='Skapa ett rum eller anslut med en rumskod.';
-    const createTab=body.querySelector('[data-online-tab="create"]');
-    const joinTab=body.querySelector('[data-online-tab="join"]');
-    if(createTab)createTab.textContent='Skapa rum';
-    if(joinTab)joinTab.textContent='Anslut till rum';
+    if(title&&title.textContent.includes('Spela Orten tillsammans'))setText(title,'Online');
+    if(intro)setText(intro,'Skapa ett rum eller anslut med en rumskod.');
+    setText(body.querySelector('[data-online-tab="create"]'),'Skapa rum');
+    setText(body.querySelector('[data-online-tab="join"]'),'Anslut till rum');
   }
 
   function refresh(){
-    ensureGuide();ensureAdvancedToggle();updateInstruction();simplifyOnlineModal();
+    refreshQueued=false;
+    ensureGuide();
+    ensureAdvancedToggle();
+    updateInstruction();
+    simplifyOnlineModal();
+  }
+
+  function scheduleRefresh(){
+    if(refreshQueued)return;
+    refreshQueued=true;
+    requestAnimationFrame(refresh);
   }
 
   function init(){
     installStyles();
     refresh();
-    if(document.body)new MutationObserver(refresh).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['class','data-setup-step']});
-    document.addEventListener('click',()=>setTimeout(refresh,0),true);
+    const setup=document.getElementById('setupScreen');
+    if(setup)new MutationObserver(scheduleRefresh).observe(setup,{attributes:true,attributeFilter:['class','data-setup-step'],childList:true,subtree:true});
+    const modal=document.getElementById('onlineModal');
+    if(modal)new MutationObserver(scheduleRefresh).observe(modal,{childList:true,subtree:true});
+    document.addEventListener('click',()=>setTimeout(scheduleRefresh,0),true);
   }
 
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
