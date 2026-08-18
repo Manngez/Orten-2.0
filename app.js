@@ -192,6 +192,7 @@
       const button=event.target?.closest?.('button');if(!button)return;
 
       if(button.id==='startButton'){
+        if(document.getElementById('setupScreen')?.classList.contains('online-host-mode'))return;
         const inputs=[...document.querySelectorAll('#playerInputs input')];
         let count=inputs.length;
         try{if(typeof settings!=='undefined')count=Math.max(1,Number(settings.playerCount)||inputs.length)}catch{}
