@@ -34,9 +34,11 @@
       /* Wizard: tydlig men kompakt. */
       #setupWizardNav{max-width:780px!important;margin-top:8px!important;margin-bottom:4px!important}
       #setupWizardNav .wizard-progress small{font-size:10px!important}
-      #setupScreen[data-setup-step="1"] #setupEntryBack{display:flex!important}
+      #setupScreen:not(.online-host-mode)[data-setup-step="1"] #setupEntryBack{display:flex!important}
+      #setupScreen.online-host-mode #setupEntryBack,
       #setupScreen:not([data-setup-step="1"]) #setupEntryBack{display:none!important}
-      #setupScreen[data-setup-step="1"] #onlineHostContext{display:flex!important}
+      #setupScreen.online-host-mode[data-setup-step="1"] #onlineHostContext{display:flex!important}
+      #setupScreen:not(.online-host-mode) #onlineHostContext,
       #setupScreen:not([data-setup-step="1"]) #onlineHostContext{display:none!important}
 
       /* Steg 3: visa bara det som behövs. */
