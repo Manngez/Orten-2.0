@@ -30,6 +30,7 @@
     style.textContent=`
       #streetDuelMode{border-color:rgba(255,216,106,.24);background:linear-gradient(145deg,rgba(49,42,18,.78),rgba(7,19,31,.96))}
       #streetDuelMode .mode-icon{filter:drop-shadow(0 0 16px rgba(255,216,106,.24))}
+      #setupScreen.online-host-mode #streetDuelMode{display:none!important}
       .street-duel-screen{min-height:100dvh;background:radial-gradient(circle at 15% 12%,rgba(255,216,106,.08),transparent 30%),#06111d;color:#eefaff}
       .street-duel-top{height:64px;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid rgba(132,181,201,.16);background:rgba(5,15,25,.94);position:relative;z-index:510}
       .street-duel-top button{width:42px;height:42px;border-radius:13px;border:1px solid rgba(132,181,201,.22);background:#0b1c2a;color:#fff;font-size:20px}
@@ -63,8 +64,16 @@
     if(!grid||$('streetDuelMode')) return;
     const button=document.createElement('button');
     button.id='streetDuelMode';button.type='button';button.className='mode-card';
-    button.innerHTML='<span class="mode-icon">🏙️</span><strong>Gatduell Umeå</strong><small>Svara med en gata som korsar den aktuella.</small>';
-    button.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();open();});
+    button.dataset.localOnly='true';
+    button.innerHTML='<span class="mode-icon">🏙️</span><strong>Gatduell Umeå</strong><small>En enhet · svara med en gata som korsar den aktuella.</small>';
+    button.addEventListener('click',event=>{
+      event.preventDefault();event.stopPropagation();
+      if($('setupScreen')?.classList.contains('online-host-mode')){
+        try{if(typeof toast==='function')toast('Gatduell spelas på en enhet. Välj Klassisk eller Tålighet för onlinerum.','error',4200)}catch{}
+        return;
+      }
+      open();
+    });
     grid.appendChild(button);
   }
 
@@ -279,7 +288,7 @@
   function showLobby(message=''){
     stopTimer();
     const card=$('streetDuelOverlayCard');
-    card.innerHTML=`<span class="eyebrow">NYTT LOKALT SPELLÄGE</span><h2>🏙️ Gatduell Umeå</h2><p>Ni turas om att skriva en gata som faktiskt korsar den aktuella gatan. Fel korsning eller slut på tiden kostar rundan. Först till tre rundvinster vinner.</p><div class="street-duel-names"><input id="streetDuelName0" maxlength="24" value="Spelare 1" aria-label="Namn spelare 1"><input id="streetDuelName1" maxlength="24" value="Spelare 2" aria-label="Namn spelare 2"></div><button id="streetDuelStart" class="street-duel-big-button" type="button" ${graph?'':'disabled'}>${graph?'Starta Gatduell':'Laddar Umeås gator…'}</button><div id="streetDuelLoad" class="street-duel-load">${message|| (graph?`${graph.size} korsande gatunamn redo.`:'Hämtar gatnät…')}</div>`;
+    card.innerHTML=`<span class="eyebrow">LOKALT SPELLÄGE</span><h2>🏙️ Gatduell Umeå</h2><p>Ni spelar på samma enhet och turas om att skriva en gata som faktiskt korsar den aktuella gatan. Fel korsning eller slut på tiden kostar rundan. Först till tre rundvinster vinner.</p><div class="street-duel-names"><input id="streetDuelName0" maxlength="24" value="" placeholder="Spelare 1 · namn" aria-label="Namn spelare 1"><input id="streetDuelName1" maxlength="24" value="" placeholder="Spelare 2 · namn" aria-label="Namn spelare 2"></div><button id="streetDuelStart" class="street-duel-big-button" type="button" ${graph?'':'disabled'}>${graph?'Starta Gatduell':'Laddar Umeås gator…'}</button><div id="streetDuelLoad" class="street-duel-load">${message|| (graph?`${graph.size} korsande gatunamn redo.`:'Hämtar gatnät…')}</div>`;
     $('streetDuelOverlay').classList.remove('hidden');
     if(graph) bindLobbyStart();
     else loadGraph().then(()=>{if(!$('streetDuelOverlay')?.classList.contains('hidden'))showLobby(`${graph.size} korsande gatunamn redo.`);}).catch(error=>{
@@ -296,6 +305,10 @@
   }
 
   function open(){
+    if($('setupScreen')?.classList.contains('online-host-mode')){
+      try{if(typeof toast==='function')toast('Gatduell är ett läge för En enhet. Gå tillbaka och välj En enhet först.','error',4200)}catch{}
+      return;
+    }
     ensureScreen();injectStyles();showOnly('streetDuel');ensureMap();setTimeout(()=>streetMap.invalidateSize(),80);showLobby();
   }
 
