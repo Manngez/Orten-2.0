@@ -19,7 +19,11 @@
     if(parts.length!==8||parts[0]!=='replay'||parts[1]!=='game'||parts[2]!=='1')return null;
     const stamp=Number(parts[3]),score=Math.floor(Number(row.score)||0);
     if(!Number.isFinite(stamp)||stamp<1)return null;
-    return {id:parts[4],stamp,mode:parts[5],area:parts[6],room:parts[7]==='-'?'':parts[7],firstPlayer:String(row.player_name||''),score,updatedAt:row.updated_at?Date.parse(row.updated_at):stamp};
+    const rawName=String(row.player_name||'');
+    const markedStarted=/^⏳\s*/.test(rawName);
+    const firstPlayer=rawName.replace(/^⏳\s*/, '').trim();
+    const status=markedStarted||score<=0?'started':'completed';
+    return {id:parts[4],stamp,mode:parts[5],area:parts[6],room:parts[7]==='-'?'':parts[7],firstPlayer,score,status,updatedAt:row.updated_at?Date.parse(row.updated_at):stamp};
   }
 
   function parsePlayer(row){
@@ -55,11 +59,8 @@
   function areaText(area){return ({WORLD:'Världen',EUROPE:'Europa',NORDIC:'Norden',UMEA:'Umeå',SE:'Sverige',CUSTOM:'Eget område'})[area]||area||'Okänt område'}
   function dateText(stamp){try{return new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}).format(new Date(stamp))}catch{return ''}}
   function shortDateText(stamp){try{return new Intl.DateTimeFormat('sv-SE',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(stamp))}catch{return ''}}
-  function localDateKey(stamp){
-    const date=new Date(stamp);if(Number.isNaN(date.getTime()))return '';
-    const year=date.getFullYear(),month=String(date.getMonth()+1).padStart(2,'0'),day=String(date.getDate()).padStart(2,'0');
-    return `${year}-${month}-${day}`;
-  }
+  function localDateKey(stamp){const date=new Date(stamp);if(Number.isNaN(date.getTime()))return '';return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`}
+  function statusText(game){return game.status==='completed'?'✓ Avslutat':'⏳ Startat'}
   function playerNames(id,first=''){
     const names=(playerMap.get(id)||[]).sort((a,b)=>a.index-b.index).map(player=>player.name).filter(Boolean);
     return names.length?names.join(' · '):(first||'Okänd spelare');
@@ -69,8 +70,7 @@
     const mode=$('modeFilter')?.value||'all';
     const period=$('periodFilter')?.value||'all';
     const specific=$('dateFilter')?.value||'';
-    const now=Date.now();
-    const startToday=new Date();startToday.setHours(0,0,0,0);
+    const now=Date.now();const startToday=new Date();startToday.setHours(0,0,0,0);
     return games.filter(game=>{
       if(mode!=='all'&&game.mode!==mode)return false;
       if(specific&&localDateKey(game.stamp)!==specific)return false;
@@ -87,53 +87,37 @@
   function filtersActive(){return ($('modeFilter')?.value||'all')!=='all'||($('periodFilter')?.value||'all')!=='all'||!!$('dateFilter')?.value}
 
   async function loadHistory(){
-    $('refresh').disabled=true;
-    $('status').className='status loading';
-    $('status').textContent='Hämtar spelhistorik…';
-    $('list').innerHTML='';
+    $('refresh').disabled=true;$('status').className='status loading';$('status').textContent='Hämtar alla spelstarter…';$('list').innerHTML='';
     try{
       const [summaryResult,playerResult]=await Promise.all([
-        client.from(TABLE).select('player_name,score,updated_at,board_key').like('board_key','replay|game|1|%').order('updated_at',{ascending:false}).limit(1500),
+        client.from(TABLE).select('player_name,score,updated_at,board_key').like('board_key','replay|game|1|%').order('updated_at',{ascending:false}).limit(3000),
         client.from(TABLE).select('player_name,board_key').like('board_key','replay|player|1|%').limit(10000)
       ]);
-      if(summaryResult.error)throw summaryResult.error;
-      if(playerResult.error)throw playerResult.error;
-
+      if(summaryResult.error)throw summaryResult.error;if(playerResult.error)throw playerResult.error;
       playerMap=new Map();
-      for(const row of playerResult.data||[]){
-        const player=parsePlayer(row);if(!player)continue;
-        const list=playerMap.get(player.id)||[];
-        if(!list.some(item=>item.index===player.index&&item.name===player.name))list.push(player);
-        playerMap.set(player.id,list);
-      }
-
+      for(const row of playerResult.data||[]){const player=parsePlayer(row);if(!player)continue;const list=playerMap.get(player.id)||[];if(!list.some(item=>item.index===player.index&&item.name===player.name))list.push(player);playerMap.set(player.id,list)}
       const deduped=new Map();
-      for(const row of summaryResult.data||[]){
-        const game=parseSummary(row);if(!game)continue;
-        const current=deduped.get(game.id);
-        if(!current||game.updatedAt>current.updatedAt)deduped.set(game.id,game);
-      }
+      for(const row of summaryResult.data||[]){const game=parseSummary(row);if(!game)continue;const current=deduped.get(game.id);if(!current||game.updatedAt>current.updatedAt||(game.status==='completed'&&current.status!=='completed'))deduped.set(game.id,game)}
       games=[...deduped.values()].sort((a,b)=>b.stamp-a.stamp);
       renderList();
+      const completed=games.filter(game=>game.status==='completed').length;
+      const started=games.length-completed;
       $('status').className='status ok';
-      $('status').textContent=games.length?`${games.length} genomförda spel laddade.`:'Inga spel har sparats med den nya historiken ännu.';
-    }catch(error){
-      console.error(error);
-      $('status').className='status error';
-      $('status').textContent='Kunde inte hämta spelhistoriken. Försök igen.';
-      $('filterCount').textContent='0 spel';
-    }finally{$('refresh').disabled=false}
+      $('status').textContent=games.length?`${games.length} startade spel registrerade · ${completed} avslutade · ${started} utan registrerat avslut.`:'Inga spelstarter har registrerats ännu.';
+      const intro=document.querySelector('.top p');if(intro)intro.textContent='Alla registrerade spelstarter – även matcher som aldrig avslutades – samt resultat och sparade rutter när de finns.';
+    }catch(error){console.error(error);$('status').className='status error';$('status').textContent='Kunde inte hämta spelhistoriken. Försök igen.';$('filterCount').textContent='0 spel'}finally{$('refresh').disabled=false}
   }
 
   function renderList(){
-    const visible=filteredGames();
-    $('filterCount').textContent=filtersActive()?`${visible.length} av ${games.length} spel`:`${games.length} spel`;
-    if(!games.length){$('list').innerHTML='<div class="empty">Nya genomförda spel kommer att visas här automatiskt.</div>';return}
-    if(!visible.length){$('list').innerHTML='<div class="empty">Inga spel matchar de valda filtren.</div>';return}
-    $('list').innerHTML=visible.map(game=>`<article class="game-row"><button type="button" data-game-id="${safe(game.id)}"><div class="game-main"><span class="time">${safe(dateText(game.stamp))}</span><strong>${safe(modeText(game.mode))} · ${safe(areaText(game.area))}</strong><small>${safe(playerNames(game.id,game.firstPlayer))}${game.room?` · Online ${safe(game.room)}`:''}</small></div><div class="score"><b>${game.score}</b><span>${game.mode==='street'?'gatval':'drag'}</span></div><span class="arrow">→</span></button></article>`).join('');
-    $('list').querySelectorAll('[data-game-id]').forEach(button=>button.addEventListener('click',()=>{
-      const game=games.find(item=>item.id===button.dataset.gameId);if(game)openGame(game);
-    }));
+    const visible=filteredGames();$('filterCount').textContent=filtersActive()?`${visible.length} av ${games.length} starter`:`${games.length} starter`;
+    if(!games.length){$('list').innerHTML='<div class="empty">Varje nytt spel kommer att registreras här när det startas.</div>';return}
+    if(!visible.length){$('list').innerHTML='<div class="empty">Inga spelstarter matchar de valda filtren.</div>';return}
+    $('list').innerHTML=visible.map(game=>{
+      const names=playerNames(game.id,game.firstPlayer);
+      const status=game.status==='completed'?'<b>✓</b><span>AVSLUTAT</span>':'<b style="color:var(--gold)">⏳</b><span>STARTAT</span>';
+      return `<article class="game-row"><button type="button" data-game-id="${safe(game.id)}"><div class="game-main"><span class="time">${safe(dateText(game.stamp))} · ${safe(statusText(game))}</span><strong>${safe(modeText(game.mode))} · ${safe(areaText(game.area))}</strong><small>${safe(names)}${game.room?` · Online ${safe(game.room)}`:''}</small></div><div class="score">${game.status==='completed'?`<b>${game.score}</b><span>${game.mode==='street'?'GATVAL':'DRAG'}</span>`:status}</div><span class="arrow">→</span></button></article>`;
+    }).join('');
+    $('list').querySelectorAll('[data-game-id]').forEach(button=>button.addEventListener('click',()=>{const game=games.find(item=>item.id===button.dataset.gameId);if(game)openGame(game)}));
   }
 
   function destroyMap(){if(map){try{map.remove()}catch{}map=null;mapLayer=null}}
@@ -146,9 +130,7 @@
       client.from(TABLE).select('player_name,score,board_key').like('board_key',`replay|player|1|${id}|%`).limit(20)
     ]);
     for(const result of [pointsResult,crossResult,streetResult,playersResult])if(result.error)throw result.error;
-    const unique=(rows,parser,keyFn)=>{
-      const values=new Map();for(const row of rows||[]){const parsed=parser(row);if(parsed)values.set(keyFn(parsed),parsed)}return [...values.values()];
-    };
+    const unique=(rows,parser,keyFn)=>{const values=new Map();for(const row of rows||[]){const parsed=parser(row);if(parsed)values.set(keyFn(parsed),parsed)}return [...values.values()]};
     return {
       points:unique(pointsResult.data,parsePoint,item=>`${item.round}|${item.index}|${item.playerIndex}|${item.lat}|${item.lon}`),
       crossings:unique(crossResult.data,parseCrossing,item=>`${item.round}|${item.index}|${item.lat}|${item.lon}`),
@@ -157,112 +139,54 @@
     };
   }
 
-  function statText(player){
-    const match=String(player?.stat||'').match(/^([sk])(\d+)$/);if(!match)return '';
-    const value=Number(match[2])||0;
-    return match[1]==='s'?`${value} poäng`:`${value} korsning${value===1?'':'ar'}`;
-  }
+  function statText(player){const match=String(player?.stat||'').match(/^([sk])(\d+)$/);if(!match)return '';const value=Number(match[2])||0;return match[1]==='s'?`${value} poäng`:`${value} korsning${value===1?'':'ar'}`}
+  function playerCards(players){if(!players?.length)return '';return `<section class="player-section"><div class="detail-section-title"><h3>Spelare</h3><span>${players.length} spelare</span></div><div class="player-cards">${players.map((player,index)=>`<div class="player-card"><i style="--player:${COLORS[index%COLORS.length]}"></i><div><strong>${safe(player.name)}</strong>${statText(player)?`<span>${safe(statText(player))}</span>`:''}</div></div>`).join('')}</div></section>`}
 
-  function playerCards(players){
-    if(!players?.length)return '';
-    return `<section class="player-section"><div class="detail-section-title"><h3>Spelare</h3><span>${players.length} ${players.length===1?'spelare':'spelare'}</span></div><div class="player-cards">${players.map((player,index)=>`<div class="player-card"><i style="--player:${COLORS[index%COLORS.length]}"></i><div><strong>${safe(player.name)}</strong>${statText(player)?`<span>${safe(statText(player))}</span>`:''}</div></div>`).join('')}</div></section>`;
+  function startedDetail(game){
+    const type=game.room?`Online ${game.room}`:'Lokalt spel';
+    return `<button id="back" class="back" type="button">← Alla spel</button><div class="detail-head"><div class="detail-head-copy"><span class="eyebrow">${safe(dateText(game.stamp))}</span><h2>${safe(modeText(game.mode))} · ${safe(areaText(game.area))}</h2><p>${safe(playerNames(game.id,game.firstPlayer))}${game.room?` · Online ${safe(game.room)}`:''}</p></div><div class="big-score"><b style="color:var(--gold)">⏳</b><span>STARTAT</span></div></div><div class="detail-summary"><div class="summary-card"><span>Status</span><strong>Startat</strong></div><div class="summary-card"><span>Spelläge</span><strong>${safe(modePlain(game.mode))}</strong></div><div class="summary-card"><span>Område</span><strong>${safe(areaText(game.area))}</strong></div><div class="summary-card"><span>Starttid</span><strong>${safe(shortDateText(game.stamp))}</strong></div><div class="summary-card"><span>Typ</span><strong>${safe(type)}</strong></div></div><div class="empty">Spelet startades, men något avslut har inte registrerats i historiken. Om matchen avslutas senare uppdateras samma historikpost.</div>`;
   }
 
   function detailSummary(game,data){
     const rounds=game.mode==='street'?[...new Set(data.streets.map(item=>item.round))]:[...new Set(data.points.map(item=>item.round))];
     const moveCount=game.mode==='street'?data.streets.length:data.points.length;
-    const cards=[
-      ['Spelläge',modePlain(game.mode)],
-      ['Område',areaText(game.area)],
-      ['Tid',shortDateText(game.stamp)],
-      [game.mode==='street'?'Gatval':'Drag',String(game.score||moveCount)],
-      ['Rundor',String(rounds.length||1)],
-      ['Spelare',String(data.players.length||1)]
-    ];
+    const cards=[['Status','Avslutat'],['Spelläge',modePlain(game.mode)],['Område',areaText(game.area)],['Starttid',shortDateText(game.stamp)],[game.mode==='street'?'Gatval':'Drag',String(game.score||moveCount)],['Rundor',String(rounds.length||1)],['Spelare',String(data.players.length||1)]];
     if(game.mode!=='street')cards.push(['Korsningar',String(data.crossings.length)]);
     cards.push(['Typ',game.room?`Online ${game.room}`:'Lokalt spel']);
-    return `<div class="detail-summary">${cards.map(([label,value],index)=>`<div class="summary-card${index===3?' accent':''}"><span>${safe(label)}</span><strong>${safe(value)}</strong></div>`).join('')}</div>`;
+    return `<div class="detail-summary">${cards.map(([label,value],index)=>`<div class="summary-card${index===4?' accent':''}"><span>${safe(label)}</span><strong>${safe(value)}</strong></div>`).join('')}</div>`;
   }
 
-  function bindBack(){
-    $('back')?.addEventListener('click',()=>{destroyMap();$('detailView').classList.add('hidden');$('historyView').classList.remove('hidden');window.scrollTo({top:0,behavior:'auto'})});
-  }
+  function bindBack(){$('back')?.addEventListener('click',()=>{destroyMap();$('detailView').classList.add('hidden');$('historyView').classList.remove('hidden');window.scrollTo({top:0,behavior:'auto'})})}
 
   async function openGame(game){
-    destroyMap();
-    $('historyView').classList.add('hidden');
-    $('detailView').classList.remove('hidden');
-    $('detailView').innerHTML=`<button id="back" class="back" type="button">← Alla spel</button><div class="detail-head"><div class="detail-head-copy"><span class="eyebrow">${safe(dateText(game.stamp))}</span><h2>${safe(modeText(game.mode))} · ${safe(areaText(game.area))}</h2><p>${safe(playerNames(game.id,game.firstPlayer))}</p></div><div class="big-score"><b>${game.score}</b><span>${game.mode==='street'?'GATVAL':'DRAG'}</span></div></div><div class="detail-loading">Hämtar spelomgången…</div>`;
-    bindBack();
-    window.scrollTo({top:0,behavior:'auto'});
+    destroyMap();$('historyView').classList.add('hidden');$('detailView').classList.remove('hidden');window.scrollTo({top:0,behavior:'auto'});
+    if(game.status!=='completed'){$('detailView').innerHTML=startedDetail(game);bindBack();return}
+    $('detailView').innerHTML=`<button id="back" class="back" type="button">← Alla spel</button><div class="detail-head"><div class="detail-head-copy"><span class="eyebrow">${safe(dateText(game.stamp))}</span><h2>${safe(modeText(game.mode))} · ${safe(areaText(game.area))}</h2><p>${safe(playerNames(game.id,game.firstPlayer))}</p></div><div class="big-score"><b>${game.score}</b><span>${game.mode==='street'?'GATVAL':'DRAG'}</span></div></div><div class="detail-loading">Hämtar spelomgången…</div>`;bindBack();
     try{
-      const data=await loadGameRows(game.id);
-      const names=data.players.length?data.players.map(player=>player.name).join(' · '):playerNames(game.id,game.firstPlayer);
-      $('detailView').innerHTML=`<button id="back" class="back" type="button">← Alla spel</button><div class="detail-head"><div class="detail-head-copy"><span class="eyebrow">${safe(dateText(game.stamp))}</span><h2>${safe(modeText(game.mode))} · ${safe(areaText(game.area))}</h2><p>${safe(names)}${game.room?` · Online ${safe(game.room)}`:''}</p></div><div class="big-score"><b>${game.score}</b><span>${game.mode==='street'?'GATVAL':'DRAG'}</span></div></div>${detailSummary(game,data)}${playerCards(data.players)}<div id="detailContent"></div>`;
-      bindBack();
-      if(game.mode==='street')renderStreet(data.streets,data.players);else renderRoute(game,data.points,data.crossings,data.players);
-    }catch(error){
-      console.error(error);
-      $('detailView').querySelector('.detail-loading')?.remove();
-      $('detailView').insertAdjacentHTML('beforeend','<div class="empty error-box">Kunde inte hämta detaljerna för den här spelomgången.</div>');
-    }
+      const data=await loadGameRows(game.id);const names=data.players.length?data.players.map(player=>player.name).join(' · '):playerNames(game.id,game.firstPlayer);
+      $('detailView').innerHTML=`<button id="back" class="back" type="button">← Alla spel</button><div class="detail-head"><div class="detail-head-copy"><span class="eyebrow">${safe(dateText(game.stamp))}</span><h2>${safe(modeText(game.mode))} · ${safe(areaText(game.area))}</h2><p>${safe(names)}${game.room?` · Online ${safe(game.room)}`:''}</p></div><div class="big-score"><b>${game.score}</b><span>${game.mode==='street'?'GATVAL':'DRAG'}</span></div></div>${detailSummary(game,data)}${playerCards(data.players)}<div id="detailContent"></div>`;bindBack();if(game.mode==='street')renderStreet(data.streets,data.players);else renderRoute(game,data.points,data.crossings,data.players);
+    }catch(error){console.error(error);$('detailView').querySelector('.detail-loading')?.remove();$('detailView').insertAdjacentHTML('beforeend','<div class="empty error-box">Kunde inte hämta detaljerna för den här spelomgången.</div>')}
   }
 
   function renderStreet(streets,players=[]){
-    const host=$('detailContent');
-    const rounds=new Map();
-    for(const street of streets){if(!rounds.has(street.round))rounds.set(street.round,[]);rounds.get(street.round).push(street)}
-    const ordered=[...rounds.entries()].sort((a,b)=>a[0]-b[0]);
-    const lastItems=ordered.at(-1)?.[1]||[];
-    const finalScore=[...lastItems].sort((a,b)=>a.index-b.index).at(-1)?.scores||'';
-    let winner='';
-    const scoreParts=finalScore.split('-').map(Number);
-    if(players.length>=2&&scoreParts.length===2&&scoreParts.every(Number.isFinite)&&scoreParts[0]!==scoreParts[1])winner=players[scoreParts[0]>scoreParts[1]?0:1]?.name||'';
+    const host=$('detailContent');const rounds=new Map();for(const street of streets){if(!rounds.has(street.round))rounds.set(street.round,[]);rounds.get(street.round).push(street)}const ordered=[...rounds.entries()].sort((a,b)=>a[0]-b[0]);const lastItems=ordered.at(-1)?.[1]||[];const finalScore=[...lastItems].sort((a,b)=>a.index-b.index).at(-1)?.scores||'';let winner='';const scoreParts=finalScore.split('-').map(Number);if(players.length>=2&&scoreParts.length===2&&scoreParts.every(Number.isFinite)&&scoreParts[0]!==scoreParts[1])winner=players[scoreParts[0]>scoreParts[1]?0:1]?.name||'';
     const overview=`<div class="detail-section-title"><h3>Matchförlopp</h3><span>${winner?`Vinnare: ${safe(winner)}`:'Gatduell'}</span></div><div class="street-overview"><div class="summary-card"><span>Rundor</span><strong>${ordered.length}</strong></div><div class="summary-card"><span>Gatval</span><strong>${streets.length}</strong></div><div class="summary-card accent"><span>Slutställning</span><strong>${safe(finalScore||'–')}</strong></div></div>`;
-    const html=ordered.map(([round,items])=>{
-      items.sort((a,b)=>a.index-b.index);
-      const score=items.at(-1)?.scores||'';
-      return `<article class="street-round"><div><strong>Runda ${round}</strong>${score?`<span>Ställning ${safe(score)}</span>`:''}</div><p>${items.map((item,index)=>`<b>${index+1}. ${safe(item.name)}</b>`).join('<i>→</i>')}</p></article>`;
-    }).join('');
-    host.innerHTML=overview+(html||'<div class="empty">Ingen gatkedja sparades för matchen.</div>');
+    const html=ordered.map(([round,items])=>{items.sort((a,b)=>a.index-b.index);const score=items.at(-1)?.scores||'';return `<article class="street-round"><div><strong>Runda ${round}</strong>${score?`<span>Ställning ${safe(score)}</span>`:''}</div><p>${items.map((item,index)=>`<b>${index+1}. ${safe(item.name)}</b>`).join('<i>→</i>')}</p></article>`}).join('');host.innerHTML=overview+(html||'<div class="empty">Ingen gatkedja sparades för matchen.</div>');
   }
 
   function renderRoute(game,points,crossings,players=[]){
-    const host=$('detailContent');
-    const rounds=[...new Set(points.map(point=>point.round))].sort((a,b)=>a-b);
-    if(!rounds.length){host.innerHTML='<div class="empty">Ingen rutt sparades för matchen.</div>';return}
+    const host=$('detailContent');const rounds=[...new Set(points.map(point=>point.round))].sort((a,b)=>a-b);if(!rounds.length){host.innerHTML='<div class="empty">Ingen rutt sparades för matchen.</div>';return}
     host.innerHTML=`<div class="detail-section-title"><div><h3>Spelrutt</h3>${crossings.length?`<span class="crossing-note"><i></i>${crossings.length} registrerade korsningar</span>`:''}</div>${rounds.length>1?`<div class="round-picker"><label for="roundSelect">Runda</label><select id="roundSelect">${rounds.map(round=>`<option value="${round}">Runda ${round}</option>`).join('')}</select></div>`:''}</div><div id="historyMap" class="map"></div><ol id="routeList" class="route-list"></ol>`;
-    const draw=round=>drawRound(game,round,points,crossings,players);
-    $('roundSelect')?.addEventListener('change',event=>draw(Number(event.target.value)));
-    draw(rounds[0]);
+    const draw=round=>drawRound(game,round,points,crossings,players);$('roundSelect')?.addEventListener('change',event=>draw(Number(event.target.value)));draw(rounds[0]);
   }
 
   function drawRound(game,round,points,crossings,players=[]){
-    destroyMap();
-    const current=points.filter(point=>point.round===round).sort((a,b)=>a.index-b.index);
-    const cross=crossings.filter(item=>item.round===round);
-    const host=$('historyMap'),list=$('routeList');
-    if(list)list.innerHTML=current.map(point=>{
-      const player=players[point.playerIndex];
-      const sub=[point.countryCode,game.mode==='duel'&&player?.name?player.name:''].filter(Boolean).join(' · ');
-      return `<li><b>${String(point.index).padStart(2,'0')}</b><span>${safe(point.name)}${sub?`<small>${safe(sub)}</small>`:''}</span>${game.mode==='duel'?`<i class="route-player" style="background:${COLORS[point.playerIndex%COLORS.length]}"></i>`:''}</li>`;
-    }).join('');
+    destroyMap();const current=points.filter(point=>point.round===round).sort((a,b)=>a.index-b.index);const cross=crossings.filter(item=>item.round===round);const host=$('historyMap'),list=$('routeList');
+    if(list)list.innerHTML=current.map(point=>{const player=players[point.playerIndex];const sub=[point.countryCode,game.mode==='duel'&&player?.name?player.name:''].filter(Boolean).join(' · ');return `<li><b>${String(point.index).padStart(2,'0')}</b><span>${safe(point.name)}${sub?`<small>${safe(sub)}</small>`:''}</span>${game.mode==='duel'?`<i class="route-player" style="background:${COLORS[point.playerIndex%COLORS.length]}"></i>`:''}</li>`}).join('');
     if(!host||!window.L||!current.length)return;
-    map=L.map(host,{zoomControl:true,minZoom:2,maxZoom:18,worldCopyJump:true,preferCanvas:true}).setView([20,0],2);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'&copy; OpenStreetMap contributors &copy; CARTO'}).addTo(map);
-    mapLayer=L.layerGroup().addTo(map);
-
-    if(game.mode==='duel'){
-      const groups=new Map();
-      for(const point of current){if(!groups.has(point.playerIndex))groups.set(point.playerIndex,[]);groups.get(point.playerIndex).push(point)}
-      for(const [playerIndex,route] of groups){if(route.length>1)L.polyline(route.map(point=>[point.lat,point.lon]),{color:COLORS[playerIndex%COLORS.length],weight:5,opacity:.9}).addTo(mapLayer)}
-    }else if(current.length>1)L.polyline(current.map(point=>[point.lat,point.lon]),{color:COLORS[0],weight:5,opacity:.9}).addTo(mapLayer);
-
-    current.forEach(point=>L.circleMarker([point.lat,point.lon],{radius:7,color:COLORS[(game.mode==='duel'?point.playerIndex:0)%COLORS.length],weight:3,fillOpacity:.95}).addTo(mapLayer).bindTooltip(`${point.index}. ${point.name}`,{direction:'top'}));
-    cross.forEach(item=>L.circleMarker([item.lat,item.lon],{radius:10,color:'#ff5c5c',weight:4,fillOpacity:.2}).addTo(mapLayer).bindTooltip('Korsning',{direction:'top'}));
-    const bounds=L.latLngBounds(current.map(point=>[point.lat,point.lon]));
-    if(bounds.isValid())map.fitBounds(bounds,{padding:[35,35],maxZoom:8});
-    setTimeout(()=>map?.invalidateSize(),80);
+    map=L.map(host,{zoomControl:true,minZoom:2,maxZoom:18,worldCopyJump:true,preferCanvas:true}).setView([20,0],2);L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',{subdomains:'abcd',maxZoom:20,attribution:'&copy; OpenStreetMap contributors &copy; CARTO'}).addTo(map);mapLayer=L.layerGroup().addTo(map);
+    if(game.mode==='duel'){const groups=new Map();for(const point of current){if(!groups.has(point.playerIndex))groups.set(point.playerIndex,[]);groups.get(point.playerIndex).push(point)}for(const [playerIndex,route] of groups){if(route.length>1)L.polyline(route.map(point=>[point.lat,point.lon]),{color:COLORS[playerIndex%COLORS.length],weight:5,opacity:.9}).addTo(mapLayer)}}else if(current.length>1)L.polyline(current.map(point=>[point.lat,point.lon]),{color:COLORS[0],weight:5,opacity:.9}).addTo(mapLayer);
+    current.forEach(point=>L.circleMarker([point.lat,point.lon],{radius:7,color:COLORS[(game.mode==='duel'?point.playerIndex:0)%COLORS.length],weight:3,fillOpacity:.95}).addTo(mapLayer).bindTooltip(`${point.index}. ${point.name}`,{direction:'top'}));cross.forEach(item=>L.circleMarker([item.lat,item.lon],{radius:10,color:'#ff5c5c',weight:4,fillOpacity:.2}).addTo(mapLayer).bindTooltip('Korsning',{direction:'top'}));const bounds=L.latLngBounds(current.map(point=>[point.lat,point.lon]));if(bounds.isValid())map.fitBounds(bounds,{padding:[35,35],maxZoom:8});setTimeout(()=>map?.invalidateSize(),80);
   }
 
   $('refresh').addEventListener('click',loadHistory);
