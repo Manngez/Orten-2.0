@@ -222,27 +222,37 @@
   }
 
   function launchRoom(){
-    const onlineButton=document.getElementById('onlineButton');
-    if(!onlineButton) return;
     flow.committing=true;
-    onlineButton.click();
+    const modal=document.getElementById('onlineModal');
+    const nameInput=document.getElementById('onlineHostName');
+    const codeInput=document.getElementById('onlineCreateCode');
+    const createButton=document.getElementById('onlineCreateButton');
 
+    if(nameInput&&codeInput&&createButton){
+      nameInput.value=flow.hostName||storedName();
+      if(flow.roomCode)codeInput.value=flow.roomCode;
+      modal?.classList.remove('hidden');
+      createButton.textContent='Skapar rum…';
+      createButton.click();
+      setTimeout(()=>{flow.committing=false},0);
+      return;
+    }
+
+    const onlineButton=document.getElementById('onlineButton');
+    if(!onlineButton){flow.committing=false;return}
+    onlineButton.click();
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
       const createTab=document.querySelector('[data-online-tab="create"]');
-      if(createTab && !createTab.classList.contains('active')) createTab.click();
-
+      if(createTab&&!createTab.classList.contains('active'))createTab.click();
       requestAnimationFrame(()=>{
-        const nameInput=document.getElementById('onlineHostName');
-        const codeInput=document.getElementById('onlineCreateCode');
-        const createButton=document.getElementById('onlineCreateButton');
-        if(!nameInput||!codeInput||!createButton){
-          flow.committing=false;
-          return;
-        }
-        nameInput.value=flow.hostName||storedName();
-        if(flow.roomCode) codeInput.value=flow.roomCode;
-        createButton.textContent='Skapar rum…';
-        createButton.click();
+        const fallbackName=document.getElementById('onlineHostName');
+        const fallbackCode=document.getElementById('onlineCreateCode');
+        const fallbackCreate=document.getElementById('onlineCreateButton');
+        if(!fallbackName||!fallbackCode||!fallbackCreate){flow.committing=false;return}
+        fallbackName.value=flow.hostName||storedName();
+        if(flow.roomCode)fallbackCode.value=flow.roomCode;
+        fallbackCreate.textContent='Skapar rum…';
+        fallbackCreate.click();
         setTimeout(()=>{flow.committing=false},0);
       });
     }));
