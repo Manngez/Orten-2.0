@@ -7,13 +7,13 @@
   <meta name="theme-color" content="#06111d">
   <title>Spelhistorik · Orten 2.0</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="history.css">
+  <link rel="stylesheet" href="history.css?v=20260819-2321">
 </head>
 <body>
   <main class="wrap">
     <section id="historyView">
       <header class="top">
-        <div><span class="eyebrow">ORTEN 2.0 · INTERN VY</span><h1>Spelhistorik</h1><p>Genomförda matcher, spelare, resultat och sparade rutter.</p></div>
+        <div><span class="eyebrow">ORTEN 2.0 · INTERN VY</span><h1>Spelhistorik</h1><p>Alla registrerade spelstarter – även matcher som inte avslutades.</p></div>
         <button id="refresh" class="refresh" type="button">↻ Uppdatera</button>
       </header>
 
@@ -46,6 +46,20 @@
   </main>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0"></script>
-  <script src="history.js"></script>
+  <script src="history.js?v=20260819-2321"></script>
+  <script>
+    (()=>{
+      const refresh=()=>{
+        if(document.visibilityState!=='visible')return;
+        const historyView=document.getElementById('historyView');
+        if(!historyView||historyView.classList.contains('hidden'))return;
+        const button=document.getElementById('refresh');
+        if(button&&!button.disabled)button.click();
+      };
+      setInterval(refresh,3000);
+      document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(refresh,150)});
+      window.addEventListener('focus',()=>setTimeout(refresh,150));
+    })();
+  </script>
 </body>
 </html>
