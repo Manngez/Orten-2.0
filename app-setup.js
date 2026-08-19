@@ -125,5 +125,6 @@
     game.active=true; game.paused=false; game.finished=false; game.currentIndex=0; game.route=[]; game.lastCrossings=[]; game.totalCrossings=0; game.totalMoves=0; game.roundMoves=0; game.bestRound=0; game.round=1; game.pendingNextRound=false; game.followEnabled=!!game.settings.autoFollow;
     game.players=Array.from({length:game.settings.playerCount},(_,i)=>({name:(game.settings.playerNames[i]||`Spelare ${i+1}`).trim()||`Spelare ${i+1}`,strikes:0,active:true,color:PLAYER_COLORS[i]}));
     game.initialView=initialViewForSettings(game.settings);
+    try{window.OrtenGameHistory?.recordRegularStart?.()}catch(error){console.warn('Spelstarten kunde inte skickas till historiken.',error)}
     showScreen('game'); closeAllGameModals(); initMap(); resetMapToInitial(); tone('start'); updateGameUI(); resetTurnTimer(); warmPlaceIndex(); setTimeout(()=>els.placeInput.focus(),120);
   }
