@@ -11,8 +11,8 @@
   const PLAYER_LIMIT=24;
   const ROUTE_LIMIT=600;
   const PENDING_KEY='orten2:game-history-pending:v2';
-  const PENDING_MAX=24;
-  const PENDING_MAX_AGE=14*24*60*60*1000;
+  const PENDING_MAX=40;
+  const PENDING_MAX_AGE=30*24*60*60*1000;
 
   let sdkPromise=null;
   let clientPromise=null;
@@ -20,6 +20,7 @@
   let regularTrack=null;
   let streetTrack=null;
   let flushing=false;
+  let streetObserver=null;
 
   const byId=id=>document.getElementById(id);
   const clean=(value,limit=PLAYER_LIMIT)=>String(value??'').replace(/[<>|]/g,'').replace(/\s+/g,' ').trim().slice(0,limit);
@@ -73,9 +74,12 @@
     return String(badge.textContent||'').match(/\b([A-Z2-9]{4,8})\b/)?.[1]||'';
   }
 
-  function streetRoomCode(){
-    try{return String(window.OrtenStreetDuelApp?.online?.code||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)}catch{return ''}
+  function streetOnline(){
+    try{return window.OrtenStreetDuelApp?.online||{}}catch{return {}}
   }
+
+  function streetRoomCode(){return String(streetOnline().code||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8)}
+  function shouldSaveStreet(){return streetOnline().role!=='guest'}
 
   function modeCode(mode=''){
     return ({classic:'classic',endurance:'endurance',elimination:'elimination',duel:'duel',solo:'solo','street-duel':'street'})[mode]||token(mode||'orten',16).toLowerCase();
@@ -103,7 +107,7 @@
   function makeSessionId(kind,room,startedAt){
     const stamp=Math.floor(Number(startedAt)||Date.now());
     if(room){
-      const slot=Math.round(stamp/30000);
+      const slot=Math.floor(stamp/60000);
       return `${kind==='street'?'s':'o'}${quickHash(`${kind}|${room}|${slot}`)}${slot.toString(36).slice(-5)}`.slice(0,16);
     }
     return `l${stamp.toString(36)}${Math.random().toString(36).slice(2,7)}`.slice(0,16);
@@ -111,11 +115,8 @@
 
   function cleanRoute(route=[]){
     return (Array.isArray(route)?route:[]).map((point,index)=>({
-      index:index+1,
-      name:clean(point?.name||`Ort ${index+1}`),
-      lat:Number(point?.lat),lon:Number(point?.lon),
-      countryCode:token(String(point?.countryCode||'').toUpperCase(),3),
-      playerIndex:Number.isFinite(Number(point?.playerIndex))?Number(point.playerIndex):0
+      index:index+1,name:clean(point?.name||`Ort ${index+1}`),lat:Number(point?.lat),lon:Number(point?.lon),
+      countryCode:token(String(point?.countryCode||'').toUpperCase(),3),playerIndex:Number.isFinite(Number(point?.playerIndex))?Number(point.playerIndex):0
     })).filter(point=>Number.isFinite(point.lat)&&Number.isFinite(point.lon)&&Math.abs(point.lat)<=90&&Math.abs(point.lon)<=180);
   }
 
@@ -154,16 +155,15 @@
     };
   }
 
-  function regularHasCrossing(snapshot){
-    return !!(snapshot?.kind==='orten'&&(snapshot.rounds||[]).some(round=>Array.isArray(round?.crossings)&&round.crossings.length>0));
-  }
+  function regularHasCrossing(snapshot){return !!(snapshot?.kind==='orten'&&(snapshot.rounds||[]).some(round=>Array.isArray(round?.crossings)&&round.crossings.length>0))}
 
-  function startRegular(){
-    const round=currentRound();
-    const startedAt=Date.now(),room=regularRoomCode();
-    regularTrack={startedAt,roomCode:room,sessionId:makeSessionId('orten',room,startedAt),rounds:[],last:round,lastRound:round.round,lastLength:round.route.length,finalized:false,startQueued:false};
-    const snapshot=regularSnapshot('started',startedAt);
-    regularTrack.startQueued=!!queueSnapshot(snapshot);
+  function startRegular(force=false){
+    let active=false;try{active=!!game?.active}catch{}
+    if(!active)return;
+    if(!force&&regularTrack&&!regularTrack.finalized)return;
+    const round=currentRound();const startedAt=Date.now(),room=regularRoomCode();
+    regularTrack={startedAt,roomCode:room,sessionId:makeSessionId('orten',room,startedAt),rounds:[],last:round,lastRound:round.round,lastLength:round.route.length,finalized:false};
+    queueSnapshot(regularSnapshot('started',startedAt));
     void flushPending();
   }
 
@@ -201,11 +201,12 @@
     };
   }
 
-  function startStreet(dom){
+  function startStreet(dom=streetDom(),force=false){
+    if(!shouldSaveStreet()||!dom.active||!dom.current||dom.current==='–')return;
+    if(!force&&streetTrack&&!streetTrack.finalized)return;
     const startedAt=Date.now(),room=streetRoomCode();
-    streetTrack={startedAt,roomCode:room,sessionId:makeSessionId('street',room,startedAt),rounds:[],last:streetRound(dom),lastRound:dom.round,lastLength:dom.used.length,finalized:false,startQueued:false};
-    const snapshot=streetSnapshot(dom,'started',startedAt);
-    streetTrack.startQueued=!!queueSnapshot(snapshot);
+    streetTrack={startedAt,roomCode:room,sessionId:makeSessionId('street',room,startedAt),rounds:[],last:streetRound(dom),lastRound:dom.round,lastLength:dom.used.length,finalized:false};
+    queueSnapshot(streetSnapshot(dom,'started',startedAt));
     void flushPending();
   }
 
@@ -220,8 +221,7 @@
     if(snapshot?.sessionId)return token(snapshot.sessionId,16);
     const text=fingerprint(snapshot);
     try{
-      const bytes=new TextEncoder().encode(text),hash=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));
-      let binary='';hash.slice(0,12).forEach(byte=>{binary+=String.fromCharCode(byte)});
+      const bytes=new TextEncoder().encode(text),hash=new Uint8Array(await crypto.subtle.digest('SHA-256',bytes));let binary='';hash.slice(0,12).forEach(byte=>{binary+=String.fromCharCode(byte)});
       return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'').slice(0,16);
     }catch{return `g${quickHash(text)}${Math.abs(text.length).toString(36)}`.slice(0,16)}
   }
@@ -235,7 +235,6 @@
     const started=snapshot.status==='started';
     const firstName=clean(players[0]?.name||'Spelare');
     const rows=[{user_id:userId,player_name:started?clean(`⏳ ${firstName}`):firstName,board_key:`replay|game|1|${startedAt}|${id}|${mode}|${area}|${room}`,score:started?0:Math.max(1,Math.floor(Number(snapshot.totalMoves)||0)),updated_at:iso}];
-
     if(started)return rows;
 
     players.slice(0,8).forEach((player,index)=>{
@@ -254,8 +253,7 @@
     let pointCount=0;
     for(const round of snapshot.rounds||[]){
       for(const point of round.route||[]){
-        if(pointCount>=ROUTE_LIMIT)break;
-        pointCount++;
+        if(pointCount>=ROUTE_LIMIT)break;pointCount++;
         rows.push({user_id:userId,player_name:clean(point.name),board_key:`replay|pt|1|${id}|${Math.floor(Number(round.round)||1)}|${String(point.index||pointCount).padStart(3,'0')}|${Number(point.lat).toFixed(5)}|${Number(point.lon).toFixed(5)}|${Math.max(0,Math.floor(Number(point.playerIndex)||0))}|${token(point.countryCode||'-',3)}`,score:point.index||pointCount,updated_at:iso});
       }
       (round.crossings||[]).slice(0,20).forEach((crossing,index)=>rows.push({user_id:userId,player_name:'Korsning',board_key:`replay|x|1|${id}|${Math.floor(Number(round.round)||1)}|${String(index+1).padStart(2,'0')}|${Number(crossing.lat).toFixed(5)}|${Number(crossing.lon).toFixed(5)}`,score:index+1,updated_at:iso}));
@@ -266,8 +264,7 @@
 
   function readPending(){
     try{
-      const now=Date.now(),raw=JSON.parse(localStorage.getItem(PENDING_KEY)||'[]');
-      if(!Array.isArray(raw))return [];
+      const now=Date.now(),raw=JSON.parse(localStorage.getItem(PENDING_KEY)||'[]');if(!Array.isArray(raw))return [];
       return raw.filter(item=>item&&item.snapshot&&now-Number(item.queuedAt||item.snapshot.updatedAt||item.snapshot.completedAt||now)<PENDING_MAX_AGE).slice(-PENDING_MAX);
     }catch{return []}
   }
@@ -279,86 +276,83 @@
     if(snapshot.status!=='started'&&snapshot.kind==='orten'&&!regularHasCrossing(snapshot))return null;
     if(snapshot.status!=='started'&&Number(snapshot.totalMoves)<1)return null;
     const key=snapshot.sessionId?`session:${snapshot.sessionId}`:`legacy:${Math.floor(Number(snapshot.completedAt)||Date.now())}-${quickHash(fingerprint(snapshot))}`;
-    const items=readPending();
-    const index=items.findIndex(item=>item.key===key);
-    const entry={key,queuedAt:Date.now(),snapshot};
-    if(index>=0)items[index]=entry;else items.push(entry);
-    writePending(items);
-    return key;
+    const items=readPending();const index=items.findIndex(item=>item.key===key);const entry={key,queuedAt:Date.now(),snapshot};
+    if(index>=0)items[index]=entry;else items.push(entry);writePending(items);return key;
   }
 
-  function removePending(key){const items=readPending().filter(item=>item.key!==key);writePending(items)}
+  function removePending(key){writePending(readPending().filter(item=>item.key!==key))}
 
   async function saveSnapshot(snapshot){
     if(!snapshot)return null;
     if(snapshot.status!=='started'&&snapshot.kind==='orten'&&!regularHasCrossing(snapshot))return null;
     const client=await getClient(),user=await ensureUser(),id=await gameId(snapshot),rows=gameRows(snapshot,id,user.id);
-    for(let i=0;i<rows.length;i+=400){
-      const result=await client.from(TABLE).upsert(rows.slice(i,i+400),{onConflict:'user_id,board_key'});
-      if(result.error)throw result.error;
-    }
+    for(let i=0;i<rows.length;i+=400){const result=await client.from(TABLE).upsert(rows.slice(i,i+400),{onConflict:'user_id,board_key'});if(result.error)throw result.error}
     return id;
   }
 
   async function flushPending(){
-    if(flushing||!navigator.onLine)return;
-    const items=readPending();if(!items.length)return;
-    flushing=true;
-    try{
-      for(const item of items){
-        try{await saveSnapshot(item.snapshot);removePending(item.key)}
-        catch(error){console.warn('Spelomgång väntar på nytt sparförsök.',error);break}
-      }
-    }finally{flushing=false}
+    if(flushing||!navigator.onLine)return;const items=readPending();if(!items.length)return;flushing=true;
+    try{for(const item of items){try{await saveSnapshot(item.snapshot);removePending(item.key)}catch(error){console.warn('Spelomgång väntar på nytt sparförsök.',error);break}}}finally{flushing=false}
   }
 
   function finalizeRegular(){
-    if(!regularTrack)startRegular();
-    if(regularTrack.finalized)return;
-    const finalRound=currentRound();
-    if(!finalRound.crossings.length)return;
-    regularTrack.last=finalRound;
-    const snapshot=regularSnapshot('completed',Date.now());
-    if(Number(snapshot.totalMoves)<1||!regularHasCrossing(snapshot))return;
-    regularTrack.finalized=true;
-    queueSnapshot(snapshot);
-    void flushPending();
+    if(!regularTrack)startRegular(true);if(!regularTrack||regularTrack.finalized)return;
+    const finalRound=currentRound();if(!finalRound.crossings.length)return;regularTrack.last=finalRound;
+    const snapshot=regularSnapshot('completed',Date.now());if(Number(snapshot.totalMoves)<1||!regularHasCrossing(snapshot))return;
+    regularTrack.finalized=true;queueSnapshot(snapshot);void flushPending();
   }
 
   function finalizeStreet(dom=streetDom()){
-    if(!streetTrack)startStreet(dom);
-    if(streetTrack.finalized)return;
-    const snapshot=streetSnapshot(dom,'completed',Date.now());
-    if(Number(snapshot.totalMoves)<1)return;
-    streetTrack.finalized=true;
-    queueSnapshot(snapshot);
-    void flushPending();
+    if(!shouldSaveStreet())return;
+    if(!streetTrack)startStreet(dom,true);if(!streetTrack||streetTrack.finalized)return;
+    const snapshot=streetSnapshot(dom,'completed',Date.now());if(Number(snapshot.totalMoves)<1)return;
+    streetTrack.finalized=true;queueSnapshot(snapshot);void flushPending();
   }
 
   function tickRegular(){
     let g;try{g=game}catch{return}
-    if(g?.active&&!g.finished){
-      if(!regularTrack||regularTrack.finalized)startRegular();
-      const round=currentRound();
-      if(regularTrack.last&&((round.round>regularTrack.lastRound)||(round.route.length<regularTrack.lastLength&&regularTrack.lastLength>0)))putRound(regularTrack,regularTrack.last);
-      regularTrack.last=round;regularTrack.lastRound=round.round;regularTrack.lastLength=round.route.length;
-      return;
-    }
+    if(g?.active&&!g.finished){if(!regularTrack||regularTrack.finalized)startRegular();const round=currentRound();if(regularTrack?.last&&((round.round>regularTrack.lastRound)||(round.route.length<regularTrack.lastLength&&regularTrack.lastLength>0)))putRound(regularTrack,regularTrack.last);if(regularTrack){regularTrack.last=round;regularTrack.lastRound=round.round;regularTrack.lastLength=round.route.length}return}
     if(g?.finished){finalizeRegular();return}
     if(regularTrack&&!regularTrack.finalized)regularTrack=null;
   }
 
   function tickStreet(){
-    const dom=streetDom();
-    const matchOver=dom.overlayVisible&&Math.max(...(dom.scores||[0]))>=3;
+    if(!shouldSaveStreet())return;
+    const dom=streetDom();const matchOver=dom.overlayVisible&&Math.max(...(dom.scores||[0]))>=3;
     if(matchOver){if(streetTrack&&!streetTrack.finalized)finalizeStreet(dom);return}
     if(dom.active&&dom.current&&dom.current!=='–'){
       if(!streetTrack||streetTrack.finalized)startStreet(dom);
-      if(streetTrack.last&&((dom.round>streetTrack.lastRound)||(dom.used.length<streetTrack.lastLength&&streetTrack.lastLength>0)))putStreetRound(streetTrack,streetTrack.last);
-      streetTrack.last=streetRound(dom);streetTrack.lastRound=dom.round;streetTrack.lastLength=dom.used.length;
-      return;
+      if(streetTrack?.last&&((dom.round>streetTrack.lastRound)||(dom.used.length<streetTrack.lastLength&&streetTrack.lastLength>0)))putStreetRound(streetTrack,streetTrack.last);
+      if(streetTrack){streetTrack.last=streetRound(dom);streetTrack.lastRound=dom.round;streetTrack.lastLength=dom.used.length}return;
     }
     if(streetTrack&&!streetTrack.finalized&&!dom.active)streetTrack=null;
+  }
+
+  function installImmediateStartHooks(){
+    try{
+      if(typeof startGame==='function'&&!startGame.__historyWrapped){
+        const original=startGame;
+        const wrapped=function(...args){const result=original.apply(this,args);try{if(game?.active){regularTrack=null;startRegular(true)}}catch{}return result};
+        wrapped.__historyWrapped=true;startGame=wrapped;
+      }
+    }catch(error){console.warn('Kunde inte koppla direkt historikstart för Orten.',error)}
+
+    const chain=byId('streetDuelChain');
+    if(chain&&!streetObserver){
+      let previousFirst='';
+      const detect=()=>{
+        if(!shouldSaveStreet())return;
+        const dom=streetDom();
+        if(!dom.active||!dom.current||dom.current==='–'||!dom.used.length){previousFirst='';return}
+        const first=`${dom.round}|${dom.used[0]}|${dom.scores.join('-')}`;
+        const newMatch=!streetTrack||streetTrack.finalized;
+        if(newMatch&&first!==previousFirst)startStreet(dom,true);
+        previousFirst=first;
+      };
+      streetObserver=new MutationObserver(()=>queueMicrotask(detect));
+      streetObserver.observe(chain,{childList:true,subtree:true});
+      queueMicrotask(detect);
+    }
   }
 
   function captureTerminalState(){
@@ -371,6 +365,7 @@
   window.addEventListener('pagehide',captureTerminalState,{capture:true});
   document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')captureTerminalState()});
 
+  installImmediateStartHooks();
   setInterval(()=>{tickRegular();tickStreet()},150);
   setInterval(()=>void flushPending(),10000);
   setTimeout(()=>void flushPending(),300);
