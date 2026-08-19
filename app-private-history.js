@@ -234,7 +234,7 @@
     const players=Array.isArray(snapshot.players)?snapshot.players:[];
     const started=snapshot.status==='started';
     const firstName=clean(players[0]?.name||'Spelare');
-    const rows=[{user_id:userId,player_name:started?clean(`⏳ ${firstName}`):firstName,board_key:`replay|game|1|${startedAt}|${id}|${mode}|${area}|${room}`,score:started?0:Math.max(1,Math.floor(Number(snapshot.totalMoves)||0)),updated_at:iso}];
+    const rows=[{user_id:userId,player_name:started?clean(`⏳ ${firstName}`):firstName,board_key:`replay|game|1|${startedAt}|${id}|${mode}|${area}|${room}`,score:started?1:Math.max(1,Math.floor(Number(snapshot.totalMoves)||0)),updated_at:iso}];
     if(started)return rows;
 
     players.slice(0,8).forEach((player,index)=>{
@@ -292,7 +292,12 @@
 
   async function flushPending(){
     if(flushing||!navigator.onLine)return;const items=readPending();if(!items.length)return;flushing=true;
-    try{for(const item of items){try{await saveSnapshot(item.snapshot);removePending(item.key)}catch(error){console.warn('Spelomgång väntar på nytt sparförsök.',error);break}}}finally{flushing=false}
+    try{
+      for(const item of items){
+        try{await saveSnapshot(item.snapshot);removePending(item.key)}
+        catch(error){console.warn('Spelomgång väntar på nytt sparförsök.',error)}
+      }
+    }finally{flushing=false}
   }
 
   function finalizeRegular(){
