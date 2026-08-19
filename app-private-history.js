@@ -367,7 +367,7 @@
     document.addEventListener('click',event=>{
       if(!event.target?.closest?.('#startButton'))return;
       setTimeout(()=>{
-        try{if(game?.active){regularTrack=null;startRegular(true)}}catch{}
+        try{if(game?.active&&!regularTrack)startRegular(false)}catch{}
       },0);
     },true);
 
