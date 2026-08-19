@@ -14,7 +14,7 @@
   const LAST_STATUS_KEY='orten2:game-history-last-status:v1';
   const PENDING_MAX=80;
   const PENDING_MAX_AGE=30*24*60*60*1000;
-  const START_PREFIX='STARTED:';
+  const START_PREFIX='⏳ ';
 
   let sdkPromise=null;
   let clientPromise=null;
