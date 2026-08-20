@@ -4,11 +4,22 @@ const PLAYER_COLORS=['#68f6ff','#ff8f70','#ffd86a','#73f5a7'];
 const TILE_URL='https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png';
 const TILE_ATTR='&copy; OpenStreetMap contributors &copy; CARTO';
 
-export function createGameMap(element){
+export function validLatLng(point){
+  const lat=Number(point?.lat),lon=Number(point?.lon);
+  return Number.isFinite(lat)&&Number.isFinite(lon)&&lat>=-90&&lat<=90&&lon>=-180&&lon<=180;
+}
+
+export function validLatLngPair(pair){
+  const lat=Number(pair?.[0]),lon=Number(pair?.[1]);
+  return Number.isFinite(lat)&&Number.isFinite(lon)&&lat>=-90&&lat<=90&&lon>=-180&&lon<=180;
+}
+
+export function createGameMap(element,{onWarning=()=>{}}={}){
   const L=globalThis.L;
   if(!L)throw new Error('Kartbiblioteket Leaflet kunde inte laddas.');
   if(!element)throw new Error('Kartytan saknas.');
 
+  const warn=(type,detail='')=>{try{onWarning(type,detail)}catch{}};
   const map=L.map(element,{
     zoomControl:false,
     minZoom:2,
@@ -48,25 +59,26 @@ export function createGameMap(element){
   };
 
   function focusPlace(place){
-    if(!place)return;
-    runProgrammatic(()=>map.flyTo([place.lat,place.lon],Math.max(map.getZoom(),6.5),{duration:.5}));
+    if(!validLatLng(place)){warn('map:invalid-place',String(place?.id||place?.name||'okänd'));return;}
+    runProgrammatic(()=>map.flyTo([Number(place.lat),Number(place.lon)],Math.max(map.getZoom(),6.5),{duration:.5}));
   }
 
   function fitState(state,force=false){
-    if(!state?.places?.length)return;
+    const places=(state?.places||[]).filter(validLatLng);
+    if(!places.length)return;
+    if(places.length!==(state?.places||[]).length)warn('map:invalid-place','fitState filtrerade ogiltig ort');
     if(!force&&Date.now()<userNavigatingUntil)return;
-    const places=state.places;
     if(places.length===1){focusPlace(places[0]);return;}
 
     const recent=places.length>8?places.slice(-6):places;
-    const lonSpan=Math.max(...recent.map(p=>p.lon))-Math.min(...recent.map(p=>p.lon));
+    const lonSpan=Math.max(...recent.map(p=>Number(p.lon)))-Math.min(...recent.map(p=>Number(p.lon)));
     if(lonSpan>180){
       const p=places.at(-1);
-      runProgrammatic(()=>map.flyTo([p.lat,p.lon],4.5,{duration:.55}));
+      runProgrammatic(()=>map.flyTo([Number(p.lat),Number(p.lon)],4.5,{duration:.55}));
       return;
     }
 
-    const bounds=L.latLngBounds(recent.map(p=>[p.lat,p.lon]));
+    const bounds=L.latLngBounds(recent.map(p=>[Number(p.lat),Number(p.lon)]));
     runProgrammatic(()=>map.flyToBounds(bounds,{padding:[54,54],maxZoom:6.5,duration:.55}));
   }
 
@@ -75,15 +87,21 @@ export function createGameMap(element){
     if(!state)return;
 
     for(const segment of state.segments||[]){
-      const color=PLAYER_COLORS[segment.playerIndex%PLAYER_COLORS.length];
+      if(!validLatLng(segment?.a)||!validLatLng(segment?.b)){
+        warn('map:invalid-segment',`${segment?.a?.id||'?'}→${segment?.b?.id||'?'}`);
+        continue;
+      }
+      const color=PLAYER_COLORS[(Number(segment.playerIndex)||0)%PLAYER_COLORS.length];
       for(const part of segmentParts(segment.a,segment.b)){
-        L.polyline(part,{color,weight:5,opacity:.92,lineCap:'round',interactive:false}).addTo(routeLayer);
+        if(!Array.isArray(part)||part.length<2||part.some(pair=>!validLatLngPair(pair))){warn('map:invalid-segment-part',`${segment?.a?.id||'?'}→${segment?.b?.id||'?'}`);continue;}
+        L.polyline(part.map(pair=>[Number(pair[0]),Number(pair[1])]),{color,weight:5,opacity:.92,lineCap:'round',interactive:false}).addTo(routeLayer);
       }
     }
 
     (state.places||[]).forEach((place,index)=>{
-      const color=PLAYER_COLORS[place.playerIndex%PLAYER_COLORS.length];
-      const marker=L.circleMarker([place.lat,place.lon],{
+      if(!validLatLng(place)){warn('map:invalid-place',String(place?.id||place?.name||index));return;}
+      const color=PLAYER_COLORS[(Number(place.playerIndex)||0)%PLAYER_COLORS.length];
+      const marker=L.circleMarker([Number(place.lat),Number(place.lon)],{
         radius:index===state.places.length-1?8:6,
         weight:3,
         color:'#06111d',
@@ -100,19 +118,21 @@ export function createGameMap(element){
       marker.on('click',()=>focusPlace(place));
     });
 
-    if(state.crossing&&Number.isFinite(state.crossing.lat)&&Number.isFinite(state.crossing.lon)){
-      L.circleMarker([state.crossing.lat,state.crossing.lon],{
-        radius:11,
-        weight:3,
-        color:'#ffffff',
-        fillColor:'#ff5f6d',
-        fillOpacity:1,
-        interactive:false
-      }).addTo(routeLayer);
+    if(state.crossing){
+      if(validLatLng(state.crossing)){
+        L.circleMarker([Number(state.crossing.lat),Number(state.crossing.lon)],{
+          radius:11,
+          weight:3,
+          color:'#ffffff',
+          fillColor:'#ff5f6d',
+          fillOpacity:1,
+          interactive:false
+        }).addTo(routeLayer);
+      }else warn('map:invalid-crossing','korsningspunkten ignorerades');
     }
 
-    if(forceFit||state.places.length!==lastPlaceCount)fitState(state,forceFit);
-    lastPlaceCount=state.places.length;
+    if(forceFit||(state.places||[]).length!==lastPlaceCount)fitState(state,forceFit);
+    lastPlaceCount=(state.places||[]).length;
   }
 
   function invalidate(){setTimeout(()=>map.invalidateSize(),40);}
