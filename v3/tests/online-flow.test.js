@@ -35,7 +35,7 @@ class FakePeer extends Emitter{
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
 const place=(id,name,lat,lon)=>({id,name,lat,lon,countryCode:'SE',country:'Sverige'});
 
-test('skapa rum, anslut, starta och synka drag åt båda håll',async()=>{
+test('skapa rum, anslut, synka landval, starta och synka drag åt båda håll',async()=>{
   registry.clear();guestCounter=0;globalThis.Peer=FakePeer;
   let hostState=null;let guestState=null;
   const trusted=new Map([
@@ -45,7 +45,7 @@ test('skapa rum, anslut, starta och synka drag åt båda håll',async()=>{
   const host=createOnlineController({resolvePlace:id=>trusted.get(String(id))||null,onState:event=>{hostState=event.state}});
   const guest=createOnlineController({onState:event=>{guestState=event.state}});
 
-  await host.createRoom({name:'Anna',code:'ABCDE',mode:'classic'});
+  await host.createRoom({name:'Anna',code:'ABCDE',mode:'classic',countries:['SE']});
   await guest.joinRoom({name:'Bertil',code:'ABCDE'});
   await tick();await tick();
 
@@ -53,11 +53,21 @@ test('skapa rum, anslut, starta och synka drag åt båda håll',async()=>{
   assert.equal(guest.snapshot().players.length,2);
   assert.equal(host.snapshot().status,'connected');
   assert.equal(guest.snapshot().status,'connected');
+  assert.deepEqual(host.snapshot().countries,['SE']);
+  assert.deepEqual(guest.snapshot().countries,['SE']);
+
+  host.setCountries(['SE','NO']);
+  await tick();await tick();
+  assert.deepEqual(guest.snapshot().countries,['SE','NO']);
+  host.setCountries(['SE']);
+  await tick();await tick();
 
   host.startGame();
   await tick();await tick();
   assert.equal(hostState.players[0].name,'Anna');
   assert.equal(guestState.players[1].name,'Bertil');
+  assert.deepEqual(hostState.allowedCountries,['SE']);
+  assert.deepEqual(guestState.allowedCountries,['SE']);
   assert.equal(host.canMove(),true);
   assert.equal(guest.canMove(),false);
 
