@@ -1,5 +1,5 @@
 import {createGame,playPlace,ruleText} from './engine.js';
-import {loadPlaces,searchPlaces,dataSource} from './data.js';
+import {loadPlaces,searchPlaces} from './data.js';
 import {project} from './geometry.js';
 
 const $=id=>document.getElementById(id);
@@ -51,7 +51,7 @@ $('modeGrid').addEventListener('click',event=>{
 
 $('placeInput').addEventListener('input',()=>{
   const hits=searchPlaces($('placeInput').value);
-  $('results').innerHTML=hits.map((p,i)=>`<button class="result" type="button" data-index="${i}"><b>${esc(p.name)}</b><small>${esc(p.country||p.countryCode)}</small></button>`).join('');
+  $('results').innerHTML=hits.map((p,i)=>`<button class="result" type="button" data-index="${i}"><b>${esc(p.name)}</b><small>${esc(p.region?`${p.region} · ${p.countryCode}`:p.country||p.countryCode)}</small></button>`).join('');
   $('results').querySelectorAll('[data-index]').forEach((button,i)=>button.addEventListener('click',()=>choose(hits[i])));
 });
 
@@ -67,8 +67,20 @@ $('start').addEventListener('click',()=>{
 $('back').addEventListener('click',()=>{state=null;setScreen('home')});
 
 rebuildNames();
-loadPlaces().then(info=>{
+const demoMode=new URLSearchParams(location.search).get('demo')==='1';
+loadPlaces({allowDemo:demoMode}).then(info=>{
   ready=true;
-  if(info.source==='full'){$('dataStatus').textContent=`✓ Fullt ortregister laddat · ${info.count.toLocaleString('sv-SE')} orter`;$('dataStatus').className='data-status ok'}
-  else{$('dataStatus').textContent=`Utvecklingsläge · ${info.count} testorter. Fullt ortregister kopplas in separat.`;$('dataStatus').className='data-status bad'}
-}).catch(error=>{$('dataStatus').textContent=`Ortdata kunde inte starta: ${error.message}`;$('dataStatus').className='data-status bad'});
+  $('start').disabled=false;
+  if(info.source==='full'){
+    $('dataStatus').textContent=`✓ Verifierat ortregister · ${info.count.toLocaleString('sv-SE')} orter · ${info.manifest.version}`;
+    $('dataStatus').className='data-status ok';
+  }else{
+    $('dataStatus').textContent=`⚠ Explicit demo · ${info.count} testorter. Detta läge används bara för utveckling.`;
+    $('dataStatus').className='data-status warn';
+  }
+}).catch(error=>{
+  ready=false;
+  $('start').disabled=true;
+  $('dataStatus').textContent=`⛔ Spelstart stoppad: ${error.message}`;
+  $('dataStatus').className='data-status bad';
+});
