@@ -3,7 +3,8 @@
 let rowsPromise = null;
 let countryNames = {};
 const SEARCH_LIMIT = 24;
-const DATA_VERSION = '20260814-3';
+const DATA_VERSION = 'full-v2';
+const MIN_PLACE_COUNT = 150000;
 
 const norm = value => String(value ?? '').trim().toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 
@@ -130,8 +131,12 @@ async function loadRows(){
   if(!rowsPromise){
     rowsPromise = fetch(`./data/world-places.json?v=${DATA_VERSION}`, {cache:'no-store'})
       .then(r => { if(!r.ok) throw new Error(`world-places.json ${r.status}`); return r.json(); })
-      .then(rows => { postMessage({type:'ready',count:rows.length}); return rows; })
-      .catch(err => { rowsPromise=null; throw err; });
+      .then(rows => {
+        if(!Array.isArray(rows) || rows.length < MIN_PLACE_COUNT) throw new Error(`Ortregistret är ofullständigt (${Array.isArray(rows)?rows.length:0} orter). Minst ${MIN_PLACE_COUNT} krävs.`);
+        postMessage({type:'ready',count:rows.length});
+        return rows;
+      })
+      .catch(err => { rowsPromise=null; postMessage({type:'error',message:err?.message||String(err)}); throw err; });
   }
   return rowsPromise;
 }
@@ -178,57 +183,53 @@ function nameScore(row, q){
 
 function qualifierMatch(row, qualifier){
   if(!qualifier) return false;
-  const cc=String(row[4]||'').toLowerCase();
-  const admin=norm(row[5]);
-  const region=norm(row[6]);
-  const country=norm(countryNames[row[4]]||'');
-  return cc===qualifier || admin===qualifier || region===qualifier || country===qualifier || region.includes(qualifier) || country.includes(qualifier);
+  const cc=String(row[4]||'').toUpperCase();
+  const region=norm(row[6]||'');
+  const country=norm(countryNames[cc]||'');
+  const q=norm(qualifier);
+  return cc.toLowerCase()===q || region===q || region.includes(q) || country===q || country.includes(q);
 }
 
-function searchRows(rows, query, allowedCodes, filterType){
+function searchRows(rows,query,allowedCodes,placeType){
   const raw=String(query||'').trim();
-  const parts=raw.split(',').map(norm).filter(Boolean);
-  const q=parts[0]||norm(raw);
-  const qualifier=parts.slice(1).join(' ');
-  if(!q) return {results:[],total:0};
-  const allowed=Array.isArray(allowedCodes)&&allowedCodes.length ? new Set(allowedCodes) : null;
-  const matches=[];
-  let qualifyingCount=0;
-
+  if(!raw)return [];
+  const parts=raw.split(',').map(v=>v.trim()).filter(Boolean);
+  const q=norm(parts[0]);
+  const qualifier=norm(parts.slice(1).join(' '));
+  if(!q)return [];
+  const allowed=Array.isArray(allowedCodes)&&allowedCodes.length?new Set(allowedCodes):null;
+  const scored=[];
   for(const row of rows){
-    if(allowed && !allowed.has(row[4])) continue;
-    if(!typeAllowed(row,filterType)) continue;
-    const base=nameScore(row,q); if(!base) continue;
-    const qMatch=qualifier ? qualifierMatch(row,qualifier) : false;
-    if(qMatch) qualifyingCount++;
-    const population=row[7]||0;
-    const admin=row[8]==='PPLC'||/^PPLA/.test(row[8]||'');
-    const importance=Math.log10(population+10)*70 + (admin?80:0);
-    matches.push({row,score:base+importance+(qMatch?2500:0),qMatch});
+    if(allowed&&!allowed.has(row[4]))continue;
+    if(!typeAllowed(row,placeType))continue;
+    let score=nameScore(row,q);if(!score)continue;
+    if(qualifier){if(!qualifierMatch(row,qualifier))continue;score+=1800}
+    score+=Math.min(1200,Math.log10(Math.max(1,row[7]||0))*150);
+    if(row[8]==='PPLC')score+=800;else if(/^PPLA/.test(row[8]||''))score+=400;
+    scored.push({row,score});
   }
-
-  let pool=matches;
-  if(qualifier && qualifyingCount) pool=matches.filter(m=>m.qMatch);
-  pool.sort((a,b)=>b.score-a.score || (b.row[7]||0)-(a.row[7]||0) || String(a.row[1]).localeCompare(String(b.row[1])));
-  const total=pool.length;
-  const results=pool.slice(0,SEARCH_LIMIT).map(({row})=>({
-    geonameId:row[0], id:`gn:${row[0]}`, name:(row[0]===2711537?'Göteborg':row[1]), lat:row[2], lon:row[3], countryCode:row[4], country:countryNames[row[4]]||row[4],
-    adminCode:row[5]||'', region:row[6]||'', population:row[7]||0, featureCode:row[8]||'', type:placeType(row)
-  }));
-  return {results,total};
+  scored.sort((a,b)=>b.score-a.score||(b.row[7]||0)-(a.row[7]||0)||a.row[1].localeCompare(b.row[1]));
+  const total=scored.length;
+  return {total,items:scored.slice(0,SEARCH_LIMIT).map(({row})=>({
+    geonameId:row[0],name:row[1],lat:row[2],lon:row[3],countryCode:row[4],region:row[6]||'',population:row[7]||0,type:placeType(row),country:countryNames[row[4]]||row[4]
+  }))};
 }
 
-onmessage = async event => {
+self.addEventListener('message',async event=>{
   const msg=event.data||{};
-  if(msg.countryNames) countryNames=msg.countryNames;
   try{
-    const rows=await loadRows();
-    if(msg.type==='warm') return;
-    if(msg.type==='search'){
-      const payload=searchRows(rows,msg.query,msg.allowedCodes,msg.placeType||'any');
-      postMessage({type:'result',requestId:msg.requestId,...payload});
+    if(msg.type==='warm'){
+      countryNames=msg.countryNames||countryNames;
+      await loadRows();
+      return;
     }
-  }catch(err){
-    postMessage({type:'error',requestId:msg.requestId||null,message:err?.message||String(err)});
+    if(msg.type==='search'){
+      countryNames=msg.countryNames||countryNames;
+      const rows=await loadRows();
+      const found=searchRows(rows,msg.query,msg.allowedCodes,msg.placeType);
+      postMessage({type:'result',requestId:msg.requestId,results:found.items,total:found.total});
+    }
+  }catch(error){
+    if(msg.requestId)postMessage({type:'error',requestId:msg.requestId,message:error?.message||String(error)});
   }
-};
+});
