@@ -25,9 +25,15 @@ V3 har nu också:
 - Klickbara spelade orter för snabb återfokusering.
 - Indexerad ortsökning som slipper skanna 150 000+ orter för varje tangenttryckning.
 - Stöd för GeoNames-alias och accentoberoende sökning, till exempel `umea` → `Umeå`.
-- Ett versionsmärkt onlineprotokoll med state-revisioner och skydd mot gamla state-paket.
+- En förenklad första sida med bara `En enhet` och `Online`.
+- Onlineflöde med `Skapa rum` eller `Anslut till rum`, femteckens rumskod och separat lobby.
+- Värdstyrda onlineinställningar för Klassisk eller Duell innan matchstart.
+- PeerJS/WebRTC-transport ovanpå det versionsmärkta `MOVE`/`STATE`-protokollet.
 - Host-auktoritativa onlinedrag där fel spelare inte kan göra drag utanför sin tur.
-- Validering av inkommande spelstate innan en gäst accepterar det.
+- State-revisioner som gör att gamla nätverkspaket ignoreras.
+- Automatisk gäståteranslutning med samma spelar-id och återleverans av senaste state.
+- TURN-konfiguration via `globalThis.ORTEN_TURN` när sådan finns tillgänglig.
+- Värdverifiering av varje onlinedrags GeoNames-id mot värdens eget verifierade ortregister; klientskickade koordinater används inte som auktoritativ data.
 
 Det lilla utvecklingsregistret finns kvar endast i explicit demoläge via `?demo=1`. Ett vanligt nätverks- eller datafel får aldrig tyst göra V3 spelbart med ofullständig data.
 
@@ -51,15 +57,21 @@ GitHub Pages-flödet kör V3:s tester, bygger hela GeoNames-registret och valide
 
 `src/online-protocol.js` är transportoberoende. Det definierar två centrala meddelanden:
 
-- `MOVE`: gästen föreslår en ort tillsammans med sitt spelar-id och ett unikt drag-id.
+- `MOVE`: klienten föreslår en ort tillsammans med sitt spelar-id och ett unikt drag-id.
 - `STATE`: värden skickar ett validerat komplett spelstate med monoton revision och eventuell kvittens av drag-id.
 
-Värden kontrollerar att `playerId` motsvarar spelaren vars tur det är innan `playPlace()` får köras. Gästen accepterar bara nyare revisioner och vägrar ogiltigt state. Det innebär att PeerJS/WebRTC, återanslutning och framtida transport kan bytas utan att spelreglerna behöver ändras.
+`src/online.js` ansvarar för transport, rum, lobby och återanslutning. När värden tar emot ett `MOVE` används endast ortens id för att slå upp den kanoniska orten i värdens verifierade datalager. Därefter kontrolleras spelar-id och turordning innan samma `playPlace()` som lokalspel använder får köras.
+
+Gästen accepterar bara nyare state-revisioner. Vid ett kort nätverksavbrott återansluter gästen med samma spelar-id och värden skickar senaste state igen. Spelreglerna behöver därför inte dupliceras i nätverkslagret.
+
+## Testning
+
+V3:s `npm test` kontrollerar JavaScript-syntax och kör motor-, geometri-, data-, sök- och onlineprotokolltester. `online-flow.test.js` använder en minnesbaserad PeerJS-ersättning och testar hela kedjan: skapa rum, anslut, starta match, värddrag, gästdra g och synkat state. Testet skickar även manipulerade koordinater och verifierar att värdens kanoniska ortdata används.
 
 ## Nästa steg
 
-1. Koppla PeerJS/WebRTC-transport till det nya `MOVE`/`STATE`-protokollet.
-2. Bygg den enkla V3-ingången `En enhet` / `Online`, med `Skapa rum` eller `Anslut till rum`.
-3. Återanslutning genom att gästen begär senaste state-revision från värden.
-4. En gemensam matchjournal för start, progress, avslut och replay.
-5. Gatduell som separat regelmodul ovanpå samma sessions- och nätverkslager.
+1. Webbläsartesta onlineflödet på två verkliga enheter och täta eventuella PeerJS-/mobilkantfall.
+2. Gemensam matchjournal för start, progress, avslut och replay.
+3. Återupptagning av värdrum efter full siduppdatering.
+4. Gatduell som separat regelmodul ovanpå samma sessions- och nätverkslager.
+5. När V3 är verifierad: flytta onlineflödet från utvecklingsgren till publicerbar V3-version.
