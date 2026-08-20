@@ -16,13 +16,24 @@ concurrency:
 
 jobs:
   deploy:
-    name: Publicera GitHub Pages
+    name: Bygg full ortdata och publicera GitHub Pages
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Bygg hela GeoNames cities500-registret
+        run: node scripts/build-world-data.mjs
+
+      - name: Vägra publicera ofullständig ortdata
+        run: node scripts/validate-world-data.mjs
 
       - name: Versionsmärk klienten och aktivera startloggen
         shell: bash
