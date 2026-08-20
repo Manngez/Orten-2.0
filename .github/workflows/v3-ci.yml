@@ -2,7 +2,7 @@ name: Testa Orten 3.0
 
 on:
   push:
-    branches: [v3-online-flow]
+    branches: ['v3-*']
   pull_request:
     paths:
       - 'v3/**'
