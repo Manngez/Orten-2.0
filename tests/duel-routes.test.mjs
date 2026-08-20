@@ -18,12 +18,15 @@ test('duell kopplar bara ihop samma spelares orter',()=>{
   ]);
 });
 
-test('en spelare kan korsa motståndarens linje utan egen korsning',()=>{
+test('motståndarens tidigare sträcka räknas som korsning i duell',()=>{
   const route=[
-    p('A',0,0,0),p('X',-5,5,1),p('B',0,10,0),p('Y',5,5,1),p('C',10,10,0)
+    p('A',10,0,0),p('X',-5,5,1),p('B',10,10,0),p('Y',5,5,1)
   ];
-  const hits=Duel.candidateCrossings(route,0,{name:'D',lat:10,lon:0},G);
-  assert.equal(hits.length,0);
+  const hits=Duel.candidateCrossings(route,0,{name:'D',lat:-10,lon:0},G);
+  assert.equal(hits.length,1);
+  assert.equal(hits[0].crossedStartIndex,1);
+  assert.equal(hits[0].crossedEndIndex,3);
+  assert.equal(hits[0].crossedPlayerIndex,1);
 });
 
 test('egen tidigare sträcka räknas som korsning i duell',()=>{
