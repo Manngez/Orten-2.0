@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createGame,playPlace} from '../src/engine.js';
+import {createGame,isGameState,playPlace} from '../src/engine.js';
 
 const p=(id,name,lat,lon)=>({id,name,lat,lon,country:'Test'});
 
@@ -23,6 +23,7 @@ test('klassisk hittar korsning över datumgränsen',()=>{
   g=playPlace(g,p('4','D',10,170));
   assert.equal(g.status,'finished');
   assert.equal(g.crossing.playerIndex,1);
+  assert.equal(g.winner,0);
   assert.ok(Math.abs(g.crossing.lon)>170,'korsningen ska ligga nära datumgränsen');
 });
 
@@ -60,4 +61,21 @@ test('duell räknar också korsning med egen linje',()=>{
   assert.equal(g.status,'finished');
   assert.equal(g.crossing.playerIndex,0);
   assert.equal(g.crossing.crossedPlayerIndex,0);
+});
+
+test('spelstate avvisar segment med NaN-koordinater',()=>{
+  let g=createGame({mode:'classic',players:['A','B']});
+  g=playPlace(g,p('1','A',63.8258,20.263));
+  g=playPlace(g,p('2','B',59.3293,18.0686));
+  assert.equal(isGameState(g),true);
+  g.segments[0].b.lat=NaN;
+  assert.equal(isGameState(g),false);
+});
+
+test('spelstate avvisar segment utanför giltiga lat/lon-gränser',()=>{
+  let g=createGame({mode:'classic',players:['A','B']});
+  g=playPlace(g,p('1','A',63.8258,20.263));
+  g=playPlace(g,p('2','B',59.3293,18.0686));
+  g.segments[0].a.lon=181;
+  assert.equal(isGameState(g),false);
 });
