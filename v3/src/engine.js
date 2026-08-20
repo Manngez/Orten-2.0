@@ -4,8 +4,9 @@ const clone=value=>structuredClone(value);
 const MODES=new Set(['classic','solo','duel']);
 const finiteCoord=value=>Number.isFinite(Number(value));
 const validLatLon=point=>!!point&&finiteCoord(point.lat)&&finiteCoord(point.lon)&&Number(point.lat)>=-90&&Number(point.lat)<=90&&Number(point.lon)>=-180&&Number(point.lon)<=180;
+const cleanCountries=value=>[...new Set((Array.isArray(value)?value:[]).map(code=>String(code||'').trim().toUpperCase()).filter(code=>/^[A-Z]{2}$/.test(code)))];
 
-export function createGame({mode='classic',players=[],playerIds=[]}={}){
+export function createGame({mode='classic',players=[],playerIds=[],allowedCountries=[]}={}){
   if(!MODES.has(mode))throw new Error('Okänt spelläge.');
   const cleanPlayers=players.map((name,index)=>({
     id:index,
@@ -16,13 +17,14 @@ export function createGame({mode='classic',players=[],playerIds=[]}={}){
   if(mode==='solo'&&cleanPlayers.length!==1)throw new Error('Solo kräver exakt en spelare.');
   if(mode==='duel'&&cleanPlayers.length!==2)throw new Error('Duell kräver exakt två spelare.');
   if(!cleanPlayers.length)throw new Error('Minst en spelare krävs.');
-  return {version:2,mode,status:'playing',turn:0,players:cleanPlayers,places:[],segments:[],crossing:null,winner:null};
+  return {version:2,mode,status:'playing',turn:0,players:cleanPlayers,places:[],segments:[],crossing:null,winner:null,allowedCountries:cleanCountries(allowedCountries)};
 }
 
 export function isGameState(value){
   if(!value||value.version!==2||!MODES.has(value.mode)||!['playing','finished'].includes(value.status))return false;
   if(!Array.isArray(value.players)||!value.players.length||!Array.isArray(value.places)||!Array.isArray(value.segments))return false;
   if(!Number.isInteger(value.turn)||value.turn<0||value.turn>=value.players.length)return false;
+  if(value.allowedCountries!==undefined&&(!Array.isArray(value.allowedCountries)||value.allowedCountries.some(code=>typeof code!=='string'||!/^[A-Z]{2}$/.test(code))))return false;
   if(value.players.some((p,index)=>!p||p.id!==index||typeof p.name!=='string'||!Number.isInteger(p.moves)||p.moves<0))return false;
   if(value.places.some(p=>!p||typeof p.id!=='string'||typeof p.name!=='string'||!validLatLon(p)||!Number.isInteger(p.playerIndex)||p.playerIndex<0||p.playerIndex>=value.players.length))return false;
   if(value.segments.some(segment=>!segment||!validLatLon(segment.a)||!validLatLon(segment.b)||!Number.isInteger(segment.playerIndex)||segment.playerIndex<0||segment.playerIndex>=value.players.length))return false;
@@ -48,7 +50,7 @@ function preparePlace(state,rawPlace){
     id:String(rawPlace.id??rawPlace.geonameId??`${rawPlace.name}-${rawPlace.lat}-${rawPlace.lon}`),
     name:String(rawPlace.name),
     country:String(rawPlace.country||''),
-    countryCode:String(rawPlace.countryCode||''),
+    countryCode:String(rawPlace.countryCode||'').trim().toUpperCase(),
     region:String(rawPlace.region||''),
     lat:Number(rawPlace.lat),
     lon,
@@ -92,6 +94,7 @@ export function playPlace(inputState,rawPlace){
   const state=clone(inputState);
   const place=preparePlace(state,rawPlace);
   if(!place.name||!Number.isFinite(place.lat)||!Number.isFinite(place.lon)||place.lat< -90||place.lat>90||place.lon< -180||place.lon>180)throw new Error('Ogiltig ort.');
+  if(state.allowedCountries?.length&&!state.allowedCountries.includes(place.countryCode))throw new Error('Den orten ligger utanför de valda länderna.');
   if(state.places.some(p=>p.id===place.id&&p.playerIndex===state.turn))throw new Error('Du har redan spelat den orten.');
 
   const segment=candidateSegment(state,place);
