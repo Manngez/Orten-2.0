@@ -35,11 +35,13 @@ export function applyMoveMessage(state,message){
   if(!isGameState(state))throw new Error('Värdens spelstate är ogiltigt.');
   if(message?.protocol!==ONLINE_PROTOCOL_VERSION||message?.type!=='MOVE')throw new Error('Fel onlineprotokoll för draget.');
   const playerId=cleanId(message.playerId);
+  const moveId=cleanId(message.clientMoveId);
+  if(!moveId)throw new Error('Drag-id saknas.');
   const expected=cleanId(state.players[state.turn]?.onlineId);
   if(!expected)throw new Error('Aktuell spelare saknar online-id.');
   if(playerId!==expected)throw new Error('Det är inte den spelarens tur.');
   const next=playPlace(state,cleanPlace(message.place));
-  return {state:next,ackMoveId:cleanId(message.clientMoveId)||null};
+  return {state:next,ackMoveId:moveId};
 }
 
 export function acceptStateMessage(currentRevision,message){
