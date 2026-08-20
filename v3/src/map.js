@@ -47,15 +47,16 @@ export function createGameMap(element){
     setTimeout(()=>{programmatic=false},900);
   };
 
+  function focusPlace(place){
+    if(!place)return;
+    runProgrammatic(()=>map.flyTo([place.lat,place.lon],Math.max(map.getZoom(),6.5),{duration:.5}));
+  }
+
   function fitState(state,force=false){
     if(!state?.places?.length)return;
     if(!force&&Date.now()<userNavigatingUntil)return;
     const places=state.places;
-    if(places.length===1){
-      const p=places[0];
-      runProgrammatic(()=>map.flyTo([p.lat,p.lon],6,{duration:.55}));
-      return;
-    }
+    if(places.length===1){focusPlace(places[0]);return;}
 
     const recent=places.length>8?places.slice(-6):places;
     const lonSpan=Math.max(...recent.map(p=>p.lon))-Math.min(...recent.map(p=>p.lon));
@@ -96,6 +97,7 @@ export function createGameMap(element){
         offset:[0,-8],
         className:'v3-city-tooltip'
       });
+      marker.on('click',()=>focusPlace(place));
     });
 
     if(state.crossing&&Number.isFinite(state.crossing.lat)&&Number.isFinite(state.crossing.lon)){
@@ -117,5 +119,5 @@ export function createGameMap(element){
   function reset(){runProgrammatic(()=>map.setView([24,8],2.35,{animate:false}));}
   function destroy(){map.remove();}
 
-  return {render,fitState,invalidate,reset,destroy,map};
+  return {render,fitState,focusPlace,invalidate,reset,destroy,map};
 }
