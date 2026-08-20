@@ -11,41 +11,20 @@ const cleanName=value=>String(value||'').trim().slice(0,24);
 const cleanRoom=value=>String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
 const roomPeerId=code=>`${ROOM_PREFIX}${cleanRoom(code).toLowerCase()}`;
 
-export function makeRoomCode(random=Math.random){
-  const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let out='';
-  for(let i=0;i<5;i++)out+=chars[Math.floor(random()*chars.length)%chars.length];
-  return out;
-}
-
+export function makeRoomCode(random=Math.random){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let out='';for(let i=0;i<5;i++)out+=chars[Math.floor(random()*chars.length)%chars.length];return out}
 function freshPlayerId(){return `p-${globalThis.crypto?.randomUUID?.()||`${Date.now().toString(36)}-${Math.random().toString(36).slice(2,10)}`}`}
-function makePlayerId(roomCode){
-  const key=`orten3:player:${cleanRoom(roomCode)}`;
-  try{
-    const existing=sessionStorage.getItem(key);if(existing)return existing;
-    const id=freshPlayerId();sessionStorage.setItem(key,id);return id;
-  }catch{return freshPlayerId()}
-}
-
-function peerOptions(){
-  const iceServers=[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']}];
-  const turn=globalThis.ORTEN_TURN;
-  if(turn?.urls)iceServers.push({urls:turn.urls,username:turn.username||undefined,credential:turn.credential||undefined});
-  return {debug:1,config:{iceServers,iceCandidatePoolSize:4}};
-}
+function makePlayerId(roomCode){const key=`orten3:player:${cleanRoom(roomCode)}`;try{const existing=sessionStorage.getItem(key);if(existing)return existing;const id=freshPlayerId();sessionStorage.setItem(key,id);return id}catch{return freshPlayerId()}}
+function peerOptions(){const iceServers=[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']}];const turn=globalThis.ORTEN_TURN;if(turn?.urls)iceServers.push({urls:turn.urls,username:turn.username||undefined,credential:turn.credential||undefined});return {debug:1,config:{iceServers,iceCandidatePoolSize:4}}}
 
 let peerLoader=null;
 async function loadPeer(){
   if(globalThis.Peer)return globalThis.Peer;if(peerLoader)return peerLoader;
-  peerLoader=new Promise((resolve,reject)=>{
-    const script=document.createElement('script');script.src=PEERJS_URL;script.async=true;script.dataset.orten3Peer='1';
-    script.onload=()=>globalThis.Peer?resolve(globalThis.Peer):reject(new Error('PeerJS kunde inte starta.'));
-    script.onerror=()=>reject(new Error('PeerJS kunde inte laddas.'));document.head.appendChild(script);
-  }).catch(error=>{peerLoader=null;throw error});return peerLoader;
+  peerLoader=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src=PEERJS_URL;script.async=true;script.dataset.orten3Peer='1';script.onload=()=>globalThis.Peer?resolve(globalThis.Peer):reject(new Error('PeerJS kunde inte starta.'));script.onerror=()=>reject(new Error('PeerJS kunde inte laddas.'));document.head.appendChild(script)}).catch(error=>{peerLoader=null;throw error});return peerLoader;
 }
 
 export function createOnlineController(callbacks={}){
   const cb={onStatus:callbacks.onStatus||(()=>{}),onLobby:callbacks.onLobby||(()=>{}),onState:callbacks.onState||(()=>{}),onError:callbacks.onError||(()=>{}),onClosed:callbacks.onClosed||(()=>{})};
+  const resolvePlace=typeof callbacks.resolvePlace==='function'?callbacks.resolvePlace:null;
   const net={role:'offline',status:'idle',roomCode:'',playerId:'',name:'',mode:'classic',peer:null,hostConn:null,guestConnections:new Map(),players:[],state:null,revision:-1,pendingMoveId:null,retries:0,reconnectTimer:null,started:false};
   const snapshot=()=>({role:net.role,status:net.status,roomCode:net.roomCode,playerId:net.playerId,name:net.name,mode:net.mode,players:clone(net.players),started:net.started,revision:net.revision,pending:!!net.pendingMoveId});
   const emitStatus=()=>cb.onStatus(snapshot());const emitLobby=()=>cb.onLobby(snapshot());const setStatus=status=>{net.status=status;emitStatus()};
@@ -59,7 +38,9 @@ export function createOnlineController(callbacks={}){
 
   function hostApplyMove(message){
     try{
-      const result=applyMoveMessage(net.state,message);net.state=result.state;net.revision+=1;
+      let safeMessage=message;
+      if(resolvePlace){const authoritative=resolvePlace(message?.place?.id);if(!authoritative)throw new Error('Orten finns inte i värdens verifierade register.');safeMessage={...message,place:authoritative}}
+      const result=applyMoveMessage(net.state,safeMessage);net.state=result.state;net.revision+=1;
       const stateMessage=createStateMessage(net.state,net.revision,{ackMoveId:result.ackMoveId});broadcast(stateMessage);net.pendingMoveId=null;
       cb.onState({state:clone(net.state),role:net.role,playerId:net.playerId,revision:net.revision,ackMoveId:result.ackMoveId});return true;
     }catch(error){net.pendingMoveId=null;emitStatus();cb.onError(error);return false}
@@ -69,11 +50,7 @@ export function createOnlineController(callbacks={}){
     if(message?.protocol!==ONLINE_PROTOCOL_VERSION)return;
     if(message.type==='LOBBY'){net.players=Array.isArray(message.players)?clone(message.players):[];net.mode=message.mode==='duel'?'duel':'classic';net.started=!!message.started;emitLobby();return}
     if(message.type==='STATE'){
-      try{
-        const accepted=acceptStateMessage(net.revision,message);if(!accepted.accepted)return;
-        net.revision=accepted.revision;net.state=accepted.state;net.started=true;if(accepted.ackMoveId&&accepted.ackMoveId===net.pendingMoveId)net.pendingMoveId=null;
-        cb.onState({state:clone(net.state),role:net.role,playerId:net.playerId,revision:net.revision,ackMoveId:accepted.ackMoveId});emitLobby();
-      }catch(error){cb.onError(error)}return;
+      try{const accepted=acceptStateMessage(net.revision,message);if(!accepted.accepted)return;net.revision=accepted.revision;net.state=accepted.state;net.started=true;if(accepted.ackMoveId&&accepted.ackMoveId===net.pendingMoveId)net.pendingMoveId=null;cb.onState({state:clone(net.state),role:net.role,playerId:net.playerId,revision:net.revision,ackMoveId:accepted.ackMoveId});emitLobby()}catch(error){cb.onError(error)}return;
     }
     if(message.type==='ERROR'){net.pendingMoveId=null;cb.onError(new Error(String(message.message||'Draget nekades.')));emitStatus();return}
     if(message.type==='ROOM_CLOSED'){const text=String(message.message||'Rummet stängdes.');reset();cb.onClosed(text)}
@@ -86,14 +63,8 @@ export function createOnlineController(callbacks={}){
     const meta=conn.metadata||{};const playerId=String(meta.playerId||'').slice(0,80);const name=cleanName(meta.name);
     if(!playerId||!name||Number(meta.protocol)!==ONLINE_PROTOCOL_VERSION){conn.close();return}
     const known=net.players.find(player=>player.id===playerId);const reconnecting=playerMayReconnect(playerId);
-    if((net.started&&!reconnecting)||(!known&&!reconnecting&&net.players.length>=MAX_PLAYERS)){
-      conn.on('open',()=>{send(conn,{protocol:ONLINE_PROTOCOL_VERSION,type:'ERROR',message:net.started?'Matchen har redan startat.':'Rummet är fullt.'});setTimeout(()=>conn.close(),120)});return;
-    }
-    conn.on('open',()=>{
-      const previous=net.guestConnections.get(playerId);if(previous&&previous!==conn)try{previous.close()}catch{}net.guestConnections.set(playerId,conn);
-      const player=net.players.find(item=>item.id===playerId);if(player){player.connected=true;player.name=name}else net.players.push({id:playerId,name,connected:true});
-      send(conn,lobbyMessage());if(net.started&&net.state)send(conn,createStateMessage(net.state,net.revision));broadcastLobby();
-    });
+    if((net.started&&!reconnecting)||(!known&&!reconnecting&&net.players.length>=MAX_PLAYERS)){conn.on('open',()=>{send(conn,{protocol:ONLINE_PROTOCOL_VERSION,type:'ERROR',message:net.started?'Matchen har redan startat.':'Rummet är fullt.'});setTimeout(()=>conn.close(),120)});return}
+    conn.on('open',()=>{const previous=net.guestConnections.get(playerId);if(previous&&previous!==conn)try{previous.close()}catch{}net.guestConnections.set(playerId,conn);const player=net.players.find(item=>item.id===playerId);if(player){player.connected=true;player.name=name}else net.players.push({id:playerId,name,connected:true});send(conn,lobbyMessage());if(net.started&&net.state)send(conn,createStateMessage(net.state,net.revision));broadcastLobby()});
     conn.on('data',message=>{if(message?.protocol!==ONLINE_PROTOCOL_VERSION)return;if(message.type==='MOVE'){if(!net.started||!net.state){send(conn,{protocol:ONLINE_PROTOCOL_VERSION,type:'ERROR',message:'Matchen har inte startat.'});return}const ok=hostApplyMove(message);if(!ok)send(conn,{protocol:ONLINE_PROTOCOL_VERSION,type:'ERROR',message:'Draget kunde inte godkännas.'})}});
     conn.on('close',()=>removeGuest(playerId,conn));conn.on('error',()=>removeGuest(playerId,conn));
   }
@@ -101,23 +72,16 @@ export function createOnlineController(callbacks={}){
   function connectGuest(){
     if(net.role!=='guest'||!net.peer?.open||net.hostConn?.open)return;try{net.hostConn?.close()}catch{}
     const conn=net.peer.connect(roomPeerId(net.roomCode),{reliable:true,metadata:{protocol:ONLINE_PROTOCOL_VERSION,playerId:net.playerId,name:net.name}});net.hostConn=conn;setStatus(net.retries?'reconnecting':'connecting');
-    const timeout=setTimeout(()=>{if(!conn.open)scheduleReconnect('peer-unavailable')},8000);
-    conn.on('open',()=>{clearTimeout(timeout);clearReconnect();net.retries=0;setStatus('connected')});conn.on('data',handleGuestMessage);
-    conn.on('close',()=>{clearTimeout(timeout);if(net.role==='guest')scheduleReconnect('network')});conn.on('error',error=>{clearTimeout(timeout);if(net.role==='guest')scheduleReconnect(error?.type||'network')});
+    const timeout=setTimeout(()=>{if(!conn.open)scheduleReconnect('peer-unavailable')},8000);conn.on('open',()=>{clearTimeout(timeout);clearReconnect();net.retries=0;setStatus('connected')});conn.on('data',handleGuestMessage);conn.on('close',()=>{clearTimeout(timeout);if(net.role==='guest')scheduleReconnect('network')});conn.on('error',error=>{clearTimeout(timeout);if(net.role==='guest')scheduleReconnect(error?.type||'network')});
   }
 
-  function scheduleReconnect(type){
-    if(net.role!=='guest'||net.reconnectTimer)return;if(net.retries>=RETRIES){setStatus('error');cb.onError(new Error(networkError(type)));return}
-    const delay=Math.min(1000*(2**net.retries),8000);net.retries+=1;setStatus('reconnecting');
-    net.reconnectTimer=setTimeout(()=>{net.reconnectTimer=null;try{if(!net.peer?.open)net.peer?.reconnect?.()}catch{}setTimeout(connectGuest,500)},delay);
-  }
+  function scheduleReconnect(type){if(net.role!=='guest'||net.reconnectTimer)return;if(net.retries>=RETRIES){setStatus('error');cb.onError(new Error(networkError(type)));return}const delay=Math.min(1000*(2**net.retries),8000);net.retries+=1;setStatus('reconnecting');net.reconnectTimer=setTimeout(()=>{net.reconnectTimer=null;try{if(!net.peer?.open)net.peer?.reconnect?.()}catch{}setTimeout(connectGuest,500)},delay)}
 
   async function createRoom({name,code=makeRoomCode(),mode='classic'}={}){
     reset();name=cleanName(name);code=cleanRoom(code);if(!name)throw new Error('Skriv ditt namn.');if(!code)throw new Error('Rumskod saknas.');
     const PeerCtor=await loadPeer();Object.assign(net,{role:'host',status:'connecting',roomCode:code,playerId:HOST_ID,name,mode:mode==='duel'?'duel':'classic',players:[{id:HOST_ID,name,connected:true}]});emitLobby();emitStatus();
     const peer=new PeerCtor(roomPeerId(code),peerOptions());net.peer=peer;
-    await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Nätverkstjänsten svarar inte.')),9000);peer.on('open',()=>{clearTimeout(timeout);setStatus('connected');resolve()});peer.on('connection',attachGuest);peer.on('error',error=>{if(!peer.open){clearTimeout(timeout);reject(new Error(networkError(error?.type)))}else cb.onError(new Error(networkError(error?.type)))});peer.on('disconnected',()=>{if(!peer.destroyed){setStatus('reconnecting');try{peer.reconnect()}catch{}}})});
-    broadcastLobby();return snapshot();
+    await new Promise((resolve,reject)=>{const timeout=setTimeout(()=>reject(new Error('Nätverkstjänsten svarar inte.')),9000);peer.on('open',()=>{clearTimeout(timeout);setStatus('connected');resolve()});peer.on('connection',attachGuest);peer.on('error',error=>{if(!peer.open){clearTimeout(timeout);reject(new Error(networkError(error?.type)))}else cb.onError(new Error(networkError(error?.type)))});peer.on('disconnected',()=>{if(!peer.destroyed){setStatus('reconnecting');try{peer.reconnect()}catch{}}})});broadcastLobby();return snapshot();
   }
 
   async function joinRoom({name,code}={}){
@@ -128,15 +92,8 @@ export function createOnlineController(callbacks={}){
   }
 
   function setMode(mode){if(net.role!=='host'||net.started)return false;net.mode=mode==='duel'?'duel':'classic';broadcastLobby();return true}
-  function startGame(){
-    if(net.role!=='host')throw new Error('Bara värden kan starta matchen.');if(net.players.length!==MAX_PLAYERS||net.players.some(player=>player.connected===false))throw new Error('Två anslutna spelare krävs.');
-    const roster=clone(net.players);net.state=createGame({mode:net.mode,players:roster.map(player=>player.name),playerIds:roster.map(player=>player.id)});net.revision=0;net.started=true;
-    const message=createStateMessage(net.state,net.revision);broadcast(message);broadcastLobby();cb.onState({state:clone(net.state),role:net.role,playerId:net.playerId,revision:net.revision,ackMoveId:null});return clone(net.state);
-  }
-  function submitMove(place){
-    if(!net.started||!net.state)throw new Error('Matchen har inte startat.');const current=net.state.players[net.state.turn];if(current?.onlineId!==net.playerId)throw new Error('Det är inte din tur.');if(net.pendingMoveId)throw new Error('Väntar på föregående drag.');
-    const message=createMoveMessage(net.playerId,place);net.pendingMoveId=message.clientMoveId;emitStatus();if(net.role==='host')return hostApplyMove(message);if(!net.hostConn?.open){net.pendingMoveId=null;throw new Error('Ingen kontakt med värden.')}send(net.hostConn,message);return true;
-  }
+  function startGame(){if(net.role!=='host')throw new Error('Bara värden kan starta matchen.');if(net.players.length!==MAX_PLAYERS||net.players.some(player=>player.connected===false))throw new Error('Två anslutna spelare krävs.');const roster=clone(net.players);net.state=createGame({mode:net.mode,players:roster.map(player=>player.name),playerIds:roster.map(player=>player.id)});net.revision=0;net.started=true;const message=createStateMessage(net.state,net.revision);broadcast(message);broadcastLobby();cb.onState({state:clone(net.state),role:net.role,playerId:net.playerId,revision:net.revision,ackMoveId:null});return clone(net.state)}
+  function submitMove(place){if(!net.started||!net.state)throw new Error('Matchen har inte startat.');const current=net.state.players[net.state.turn];if(current?.onlineId!==net.playerId)throw new Error('Det är inte din tur.');if(net.pendingMoveId)throw new Error('Väntar på föregående drag.');const message=createMoveMessage(net.playerId,place);net.pendingMoveId=message.clientMoveId;emitStatus();if(net.role==='host')return hostApplyMove(message);if(!net.hostConn?.open){net.pendingMoveId=null;throw new Error('Ingen kontakt med värden.')}send(net.hostConn,message);return true}
   function canMove(){return !!(net.started&&net.state?.status==='playing'&&!net.pendingMoveId&&net.state.players[net.state.turn]?.onlineId===net.playerId&&net.status==='connected')}
   function leave(){if(net.role==='host')broadcast({protocol:ONLINE_PROTOCOL_VERSION,type:'ROOM_CLOSED',message:'Värden stängde rummet.'});reset()}
   return {createRoom,joinRoom,setMode,startGame,submitMove,canMove,leave,snapshot,makeRoomCode};
