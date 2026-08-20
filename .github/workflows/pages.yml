@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Bygg full ortdata och publicera GitHub Pages
+    name: Testa, bygg full ortdata och publicera GitHub Pages
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -28,6 +28,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
+      - name: Testa Orten 3.0-motorn och datakontraktet
+        run: npm --prefix v3 test
 
       - name: Bygg hela GeoNames cities500-registret
         run: node scripts/build-world-data.mjs
