@@ -3,8 +3,9 @@ import {loadPlaces,searchPlaces,placeById} from './data.js';
 import {createGameMap} from './map.js';
 import {createOnlineController} from './online.js';
 import {createOnlineDiagnostics} from './debug.js';
-import {abandonMatchJournal,appendMatchState,createMatchJournal,saveMatchJournal} from './journal.js';
+import {abandonMatchJournal,appendMatchState,createMatchJournal,loadMatchHistory,replayMatchState,saveMatchJournal} from './journal.js';
 
+const historyStyles=document.createElement('link');historyStyles.rel='stylesheet';historyStyles.href='./history.css';document.head.appendChild(historyStyles);
 const $=id=>document.getElementById(id);
 const params=new URLSearchParams(location.search);
 const debugMode=params.get('debug')==='1';
@@ -18,21 +19,26 @@ let playContext='local';
 let diagnostics=null;
 let journal=null;
 let journalSaved=false;
+let replayJournal=null;
+let replayIndex=0;
 
 const modeName=value=>({classic:'Klassisk',solo:'Solo',duel:'Duell'})[value]||value;
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const statusName=value=>({idle:'Inte ansluten',connecting:'Ansluter…',connected:'Ansluten',reconnecting:'Återansluter…',error:'Anslutningsfel'})[value]||value;
+const dateLabel=value=>{try{return new Date(value).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'})}catch{return ''}};
 
 function setScreen(name){document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));$(name).classList.add('active')}
 function ensureMap(){if(!gameMap)gameMap=createGameMap($('map'));gameMap.invalidate();return gameMap}
 function rebuildNames(){const count=mode==='solo'?1:2;$('names').innerHTML=Array.from({length:count},(_,i)=>`<input id="name${i}" maxlength="24" value="${i===0?'Spelare 1':'Spelare 2'}" aria-label="Namn spelare ${i+1}">`).join('')}
 function networkActive(){return online.snapshot().role!=='offline'}
 function journalOwner(){const role=online.snapshot().role;return role==='offline'||role==='host'}
+function historyItems(){return loadMatchHistory()}
+function updateHistoryEntry(){$('historyEntry').classList.toggle('hidden',historyItems().length===0)}
 
 function persistJournal(){
   if(!journal||journalSaved)return;
   try{
-    if(saveMatchJournal(journal)){journalSaved=true;diagnostics?.record('journal:saved',`${journal.status} · ${journal.entries.length} steg`)}
+    if(saveMatchJournal(journal)){journalSaved=true;updateHistoryEntry();diagnostics?.record('journal:saved',`${journal.status} · ${journal.entries.length} steg`)}
   }catch(error){diagnostics?.record('journal:error',error.message||'kunde inte spara')}
 }
 
@@ -64,15 +70,20 @@ function resetJournal(){journal=null;journalSaved=false}
 
 function renderState({forceMapFit=false}={}){
   if(!state)return;
-  const onlineState=online.snapshot();const isOnline=onlineState.role!=='offline';const canMove=!isOnline||online.canMove();const current=state.players[state.turn];
+  const isReplay=!!replayJournal;
+  const onlineState=online.snapshot();const isOnline=!isReplay&&onlineState.role!=='offline';const canMove=!isReplay&&(!isOnline||online.canMove());const current=state.players[state.turn];
   $('modeBadge').textContent=modeName(state.mode);$('networkBadge').classList.toggle('hidden',!isOnline);if(isOnline)$('networkBadge').textContent=`● ${onlineState.roomCode} · ${statusName(onlineState.status)}`;
-  $('turnName').textContent=state.status==='finished'?'Match slut':current.name;
-  $('score').innerHTML=state.players.map((p,i)=>`<div class="player-score ${state.status==='playing'&&state.turn===i?'active':''}"><span>${esc(p.name)}</span><b>${p.moves}</b></div>`).join('');
+  $('turnName').textContent=isReplay?'Repris':state.status==='finished'?'Match slut':current.name;
+  $('score').innerHTML=state.players.map((p,i)=>`<div class="player-score ${!isReplay&&state.status==='playing'&&state.turn===i?'active':''}"><span>${esc(p.name)}</span><b>${p.moves}</b></div>`).join('');
   $('route').innerHTML=state.places.map((p,index)=>`<button type="button" class="route-place p${p.playerIndex}" data-place-index="${index}">${esc(p.name)}</button>`).join('');
   if(gameMap)gameMap.render(state,{forceFit:forceMapFit});
   $('placeInput').disabled=state.status!=='playing'||!canMove;$('playButton').disabled=state.status!=='playing'||!canMove;
 
-  if(state.status==='finished'){
+  if(isReplay){
+    const item=replayJournal.entries[replayIndex];
+    $('message').textContent=`${item.event==='start'?'Start':`Steg ${replayIndex}`} · ${state.places.length} spelade orter`;
+    $('message').classList.remove('cross');
+  }else if(state.status==='finished'){
     if(state.mode==='solo')$('message').textContent=`Korsning. Du nådde ${state.players[0].moves} orter.`;else $('message').textContent=`${state.players[state.crossing.playerIndex].name} skapade korsningen. ${state.players[state.winner].name} vinner.`;$('message').classList.add('cross');
   }else if(isOnline&&!canMove){$('message').textContent=onlineState.status==='connected'?`Väntar på ${current.name}.`:statusName(onlineState.status);$('message').classList.remove('cross')}
   else{$('message').textContent=ruleText(state.mode);$('message').classList.remove('cross')}
@@ -81,11 +92,51 @@ function renderState({forceMapFit=false}={}){
 
 function clearSearch(){$('placeInput').value='';$('results').innerHTML=''}
 function choose(place){
-  if(!state||state.status!=='playing')return;
+  if(replayJournal||!state||state.status!=='playing')return;
   try{
     if(networkActive()){diagnostics?.record('move:submit',`${place.name} · ${place.id}`);online.submitMove(place);clearSearch();renderState();return}
     state=playPlace(state,place);syncJournal(state,{event:'move'});clearSearch();renderState();
   }catch(error){diagnostics?.record('move:error',error.message);$('message').textContent=error.message;$('message').classList.add('cross')}
+}
+
+function renderHistory(){
+  const items=historyItems();
+  $('historyList').innerHTML=items.length?items.map(item=>{
+    const last=item.entries.at(-1)?.state;
+    const moves=last?.places?.length||0;
+    const status=item.status==='finished'?'Avslutad':'Avbruten';
+    const winner=item.status==='finished'&&Number.isInteger(item.winner)?item.players[item.winner]?.name:null;
+    return `<article class="history-card"><div class="history-card-main"><div class="history-card-top"><b>${esc(item.players.map(player=>player.name).join(' · '))}</b><span class="history-chip ${item.status==='abandoned'?'abandoned':''}">${status}</span><span class="history-chip">${esc(modeName(item.mode))}</span></div><p>${moves} spelade orter${winner?` · Vinnare: ${esc(winner)}`:''}${item.source==='online'?` · Online${item.roomCode?` ${esc(item.roomCode)}`:''}`:' · En enhet'}</p><small>${esc(dateLabel(item.startedAt))}</small></div><button class="ghost" type="button" data-replay-id="${esc(item.id)}">Visa repris</button></article>`;
+  }).join(''):'<div class="history-empty">Ingen sparad match ännu.</div>';
+  $('historyList').querySelectorAll('[data-replay-id]').forEach(button=>button.addEventListener('click',()=>openReplay(button.dataset.replayId)));
+}
+
+function showHistory(){renderHistory();setScreen('history')}
+function setReplayUi(active){
+  replayJournal=active?replayJournal:null;
+  $('game').classList.toggle('replay-mode',active);
+  $('replayControls').classList.toggle('hidden',!active);
+  $('back').textContent=active?'← Historik':'← Avsluta';
+}
+
+function renderReplayStep({forceMapFit=false}={}){
+  if(!replayJournal)return;
+  replayIndex=Math.max(0,Math.min(replayIndex,replayJournal.entries.length-1));
+  state=replayMatchState(replayJournal,replayIndex);
+  $('replayStep').textContent=`${replayIndex+1} / ${replayJournal.entries.length}`;
+  $('replayPrev').disabled=replayIndex===0;
+  $('replayNext').disabled=replayIndex===replayJournal.entries.length-1;
+  renderState({forceMapFit});
+}
+
+function openReplay(id){
+  const item=historyItems().find(match=>match.id===id);if(!item)return;
+  replayJournal=item;replayIndex=0;playContext='replay';state=replayMatchState(item,0);setReplayUi(true);setScreen('game');ensureMap();renderReplayStep({forceMapFit:true});diagnostics?.record('replay:start',id);
+}
+
+function closeReplay(){
+  diagnostics?.record('replay:close',replayJournal?.id||'');
+  replayJournal=null;replayIndex=0;state=null;playContext='local';setReplayUi(false);gameMap?.reset();showHistory();
 }
 
 function renderLobby(snapshot=online.snapshot()){
@@ -130,15 +181,16 @@ if(debugMode){
 }
 
 $('localEntry').addEventListener('click',()=>{if(ready){playContext='local';setScreen('home')}});$('onlineEntry').addEventListener('click',()=>{if(ready){playContext='online';showOnlineChoice();setScreen('online')}});
+$('historyEntry').addEventListener('click',showHistory);$('historyBack').addEventListener('click',()=>setScreen('entry'));
 $('homeBack').addEventListener('click',()=>setScreen('entry'));$('onlineBack').addEventListener('click',()=>{online.leave();resetJournal();showOnlineChoice();setScreen('entry')});
 
 $('modeGrid').addEventListener('click',event=>{const button=event.target.closest('[data-mode]');if(!button)return;mode=button.dataset.mode;document.querySelectorAll('#modeGrid [data-mode]').forEach(el=>el.classList.toggle('selected',el===button));rebuildNames()});
 $('placeInput').addEventListener('input',()=>{const hits=searchPlaces($('placeInput').value);$('results').innerHTML=hits.map((p,i)=>`<button class="result" type="button" data-index="${i}"><b>${esc(p.name)}</b><small>${esc(p.region?`${p.region} · ${p.countryCode}`:p.country||p.countryCode)}</small></button>`).join('');$('results').querySelectorAll('[data-index]').forEach((button,i)=>button.addEventListener('click',()=>choose(hits[i])))});
-$('placeForm').addEventListener('submit',event=>{event.preventDefault();const hit=searchPlaces($('placeInput').value,1)[0];if(hit)choose(hit)});
+$('placeForm').addEventListener('submit',event=>{event.preventDefault();if(replayJournal)return;const hit=searchPlaces($('placeInput').value,1)[0];if(hit)choose(hit)});
 
 $('start').addEventListener('click',()=>{
   if(!ready)return;const count=mode==='solo'?1:2;const players=Array.from({length:count},(_,i)=>String($(`name${i}`)?.value||`Spelare ${i+1}`).trim()||`Spelare ${i+1}`);
-  try{playContext='local';state=createGame({mode,players});resetJournal();beginJournal(state);setScreen('game');ensureMap();renderState({forceMapFit:true});$('placeInput').focus()}
+  try{playContext='local';replayJournal=null;setReplayUi(false);state=createGame({mode,players});resetJournal();beginJournal(state);setScreen('game');ensureMap();renderState({forceMapFit:true});$('placeInput').focus()}
   catch(error){setScreen('home');$('dataStatus').textContent=`⛔ Spelet kunde inte starta: ${error.message}`;$('dataStatus').className='data-status bad'}
 });
 
@@ -164,7 +216,12 @@ $('copyCode').addEventListener('click',async()=>{
   }catch(error){if(error?.name!=='AbortError'){$('lobbyMessage').textContent=`Rumskod: ${code}`;diagnostics?.record('room:share:error',error?.message||'kunde inte dela')}}
 });
 
+$('replayPrev').addEventListener('click',()=>{if(replayJournal&&replayIndex>0){replayIndex-=1;renderReplayStep()}});
+$('replayNext').addEventListener('click',()=>{if(replayJournal&&replayIndex<replayJournal.entries.length-1){replayIndex+=1;renderReplayStep()}});
+$('replayExit').addEventListener('click',closeReplay);
+
 $('back').addEventListener('click',()=>{
+  if(replayJournal){closeReplay();return}
   const wasOnline=networkActive();
   abandonJournal();
   if(wasOnline){diagnostics?.record('match','exit');online.leave()}
@@ -174,9 +231,9 @@ $('fitMap').addEventListener('click',()=>{if(state&&gameMap)gameMap.fitState(sta
 $('route').addEventListener('click',event=>{const button=event.target.closest('[data-place-index]');const index=Number(button?.dataset.placeIndex);if(!button||!Number.isInteger(index)||!state?.places[index]||!gameMap)return;gameMap.focusPlace(state.places[index])});
 
 rebuildNames();$('createCode').value=online.makeRoomCode();if(requestedRoom){$('joinCode').value=requestedRoom;showOnlineChoice()}
-$('localEntry').disabled=true;$('onlineEntry').disabled=true;
+setReplayUi(false);updateHistoryEntry();$('localEntry').disabled=true;$('onlineEntry').disabled=true;
 loadPlaces({allowDemo:demoMode}).then(info=>{
-  ready=true;$('start').disabled=false;$('localEntry').disabled=false;$('onlineEntry').disabled=false;diagnostics?.record('data',`${info.source} · ${info.count}`);
+  ready=true;$('start').disabled=false;$('localEntry').disabled=false;$('onlineEntry').disabled=false;diagnostics?.record('data',`${info.source} · ${info.count}`);updateHistoryEntry();
   if(info.source==='full'){$('dataStatus').textContent=`✓ ${info.count.toLocaleString('sv-SE')} verifierade orter`;$('dataStatus').className='data-status ok'}else{$('dataStatus').textContent=`⚠ Demo · ${info.count} testorter`;$('dataStatus').className='data-status warn'}
   if(requestedRoom){playContext='online';setScreen('online');$('onlineChoice').classList.add('hidden');$('joinForm').classList.remove('hidden');diagnostics?.record('deep-link',requestedRoom)}
 }).catch(error=>{ready=false;$('start').disabled=true;$('localEntry').disabled=true;$('onlineEntry').disabled=true;diagnostics?.record('data:error',error.message);$('dataStatus').textContent=`⛔ Spelstart stoppad: ${error.message}`;$('dataStatus').className='data-status bad'});
