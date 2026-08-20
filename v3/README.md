@@ -8,7 +8,7 @@ Orten 3.0 är en ren ombyggnad som utvecklas parallellt med Orten 2.0.
 - Regler är frikopplade från UI och nätverk.
 - Duell: varje ny linje testas mot alla tidigare duellsegment, både egna och motståndarens.
 - Ortdata ligger bakom ett eget datalager och får inte tyst falla tillbaka till en liten produktionsdatabas.
-- Historik och nätverk ska konsumera spelstate i stället för att återskapa spelregler.
+- Historik och nätverk konsumerar spelstate i stället för att återskapa spelregler.
 - Kartan visualiserar state men bestämmer aldrig spelreglerna.
 - Onlinegäster skickar dragförslag; värden är auktoritativ och kör draget genom samma `playPlace()` som lokalt spel.
 
@@ -36,6 +36,9 @@ V3 har nu också:
 - TURN-konfiguration via `globalThis.ORTEN_TURN` när sådan finns tillgänglig.
 - Värdverifiering av varje onlinedrags GeoNames-id mot värdens eget verifierade ortregister; klientskickade koordinater används inte som auktoritativ data.
 - Ett dolt tvåmobil-diagnostikläge som aktiveras med `?debug=1` och inte påverkar den normala spelvyn.
+- Gemensam matchjournal för lokalspel och onlinevärd.
+- Lokal historik över färdiga och avbrutna matcher.
+- Replay på samma karta med steg bakåt och framåt genom hela matchen.
 
 Det lilla utvecklingsregistret finns kvar endast i explicit demoläge via `?demo=1`. Ett vanligt nätverks- eller datafel får aldrig tyst göra V3 spelbart med ofullständig data.
 
@@ -66,7 +69,15 @@ GitHub Pages-flödet kör V3:s tester, bygger hela GeoNames-registret och valide
 
 Gästens identitet binds till PeerJS-anslutningens metadata i stället för ett självrapporterat `playerId` i MOVE-paketet. Värden minns nyligen hanterade drag-id:n och kan därför kvittera ett återsänt drag utan att spela det igen.
 
-Gästen accepterar bara nyare state-revisioner. Om själva MOVE-paketet eller STATE-kvittensen försvinner behåller gästen sitt väntande drag och skickar om samma drag-id efter återanslutning. Värden skickar samtidigt senaste state igen. Spelreglerna behöver därför inte dupliceras i nätverkslagret.
+Gästen accepterar bara nyare state-revisioner. Om själva MOVE-paketet eller STATE-kvittensen försvinner behåller gästen sitt väntande drag och skickar om samma drag-id efter återanslutning. Värden skickar samtidigt senaste state igen.
+
+## Matchjournal och historik
+
+`src/journal.js` används av både lokalspel och onlinevärd. Gästen skapar ingen konkurrerande auktoritativ historik.
+
+Varje journal innehåller start-state och ett replaysteg per spelat drag. I minnet behålls fulla state för snabb replay. Vid lagring i `localStorage` kompakteras journalen till start-state + den nya orten för varje steg, så en lång match inte sparar hela växande rutten om och om igen.
+
+Historiken visar senaste färdiga och avbrutna matcher och replay använder samma spelmotor för att bygga tillbaka varje steg. Om webbläsaren blockerar `localStorage` fortsätter själva spelet fungera; historiken degraderar då bara till otillgänglig.
 
 ## Tvåmobil-diagnostik
 
@@ -88,16 +99,18 @@ Knappen `Kopiera rapport` gör det möjligt att ta ut hela diagnostiken från en
 
 ## Testning
 
-V3:s `npm test` kontrollerar JavaScript-syntax för huvudflöde, online-transport och diagnostik och kör motor-, geometri-, data-, sök- och onlineprotokolltester.
+V3:s `npm test` kontrollerar JavaScript-syntax för huvudflöde, online-transport, diagnostik och journal och kör motor-, geometri-, data-, sök-, journal- och onlinetester.
 
-`online-flow.test.js` använder en minnesbaserad PeerJS-ersättning och testar hela kedjan: skapa rum, anslut, starta match, värddrag, gästdra g och synkat state. Testet skickar även manipulerade koordinater och verifierar att värdens kanoniska ortdata används.
+`online-flow.test.js` använder en minnesbaserad PeerJS-ersättning och testar hela kedjan: skapa rum, anslut, starta match, värddrag, gästdrag och synkat state. Testet skickar även manipulerade koordinater och verifierar att värdens kanoniska ortdata används.
 
-`online-resilience.test.js` täcker dessutom identitetsspoofing, replay av gamla drag-id:n, återanslutning efter omladdning, tappad STATE-kvittens och ett MOVE-paket som aldrig nådde värden. I båda paketförlustfallen ska draget efter återanslutning spelas exakt en gång.
+`online-resilience.test.js` täcker identitetsspoofing, replay av gamla drag-id:n, återanslutning efter omladdning, tappad STATE-kvittens och ett MOVE-paket som aldrig nådde värden. I båda paketförlustfallen ska draget efter återanslutning spelas exakt en gång.
+
+`journal.test.js` täcker start/progress, färdig match, avbruten match, replay, kompakt lagring, historikbegränsning och blockerad lokal lagring. Den senaste lokala kontrollen av journalmodulen passerade 5/5 tester.
 
 ## Nästa steg
 
 1. Köra diagnostikläget på två verkliga enheter och använda rapporterna för eventuella PeerJS-/mobilkantfall.
-2. Gemensam matchjournal för start, progress, avslut och replay.
-3. Återupptagning av värdrum efter full siduppdatering.
-4. Gatduell som separat regelmodul ovanpå samma sessions- och nätverkslager.
+2. Återupptagning av värdrum efter full siduppdatering.
+3. Gatduell som separat regelmodul ovanpå samma sessions- och nätverkslager.
+4. Förbereda frivillig synkning av matchhistorik till serverdatabasen i stället för enbart lokal lagring.
 5. När V3 är verifierad: flytta onlineflödet från utvecklingsgren till publicerbar V3-version.
