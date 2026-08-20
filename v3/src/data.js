@@ -10,6 +10,7 @@ let source='unloaded';
 let activeManifest=null;
 let buckets1=new Map();
 let buckets2=new Map();
+let byId=new Map();
 
 const norm=value=>String(value||'').trim().toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 
@@ -37,23 +38,20 @@ export function assertDatasetManifest(manifest,facts){
 function addBucket(map,key,place){
   if(!key)return;
   let bucket=map.get(key);
-  if(!bucket){bucket=[];map.set(key,bucket);}
+  if(!bucket){bucket=[];map.set(key,bucket)}
   bucket.push(place);
 }
 
 function rebuildSearchIndex(){
-  buckets1=new Map();
-  buckets2=new Map();
+  buckets1=new Map();buckets2=new Map();byId=new Map();
   for(const place of places){
+    byId.set(String(place.id),place);
     place.searchName=place.searchName||norm(place.name);
     const terms=[place.searchName,...(place.aliases||[])].map(norm).filter(Boolean);
-    const one=new Set();
-    const two=new Set();
+    const one=new Set();const two=new Set();
     for(const term of terms){
       for(const word of term.split(' ')){
-        if(!word)continue;
-        one.add(word[0]);
-        if(word.length>1)two.add(word.slice(0,2));
+        if(!word)continue;one.add(word[0]);if(word.length>1)two.add(word.slice(0,2));
       }
     }
     for(const key of one)addBucket(buckets1,key,place);
@@ -62,90 +60,50 @@ function rebuildSearchIndex(){
 }
 
 function useDemo(){
-  places=DEMO.map(place=>({...place,searchName:norm(place.name)}));
-  rebuildSearchIndex();
-  source='demo';
+  places=DEMO.map(place=>({...place,searchName:norm(place.name)}));rebuildSearchIndex();source='demo';
   activeManifest={schemaVersion:SCHEMA_VERSION,dataset:'demo',version:'demo',count:places.length,countryCount:new Set(places.map(place=>place.countryCode)).size};
   return {count:places.length,source,manifest:activeManifest};
 }
 
 export async function loadPlaces({allowDemo=false}={}){
   if(allowDemo)return useDemo();
-
-  const [manifestResponse,dataResponse]=await Promise.all([
-    fetch('../data/world-manifest.json',{cache:'no-store'}),
-    fetch('../data/world-places.json',{cache:'no-store'})
-  ]);
+  const [manifestResponse,dataResponse]=await Promise.all([fetch('../data/world-manifest.json',{cache:'no-store'}),fetch('../data/world-places.json',{cache:'no-store'})]);
   if(!manifestResponse.ok)throw new Error(`Manifestet kunde inte laddas (${manifestResponse.status}).`);
   if(!dataResponse.ok)throw new Error(`Ortregistret kunde inte laddas (${dataResponse.status}).`);
 
-  const manifest=await manifestResponse.json();
-  const raw=await dataResponse.text();
-  const integrity=await sha256(raw);
-  let rows;
-  try{rows=JSON.parse(raw);}catch{throw new Error('Ortregistret innehåller ogiltig JSON.');}
+  const manifest=await manifestResponse.json();const raw=await dataResponse.text();const integrity=await sha256(raw);let rows;
+  try{rows=JSON.parse(raw)}catch{throw new Error('Ortregistret innehåller ogiltig JSON.')}
   if(!Array.isArray(rows))throw new Error('Ortregistret har fel format.');
 
-  const mapped=[];
-  const countries=new Set();
+  const mapped=[];const countries=new Set();
   for(const row of rows){
     if(!Array.isArray(row)||row.length<11)throw new Error('Ortregistret innehåller en ogiltig rad.');
-    const id=Number(row[0]);
-    const name=String(row[1]||'').trim();
-    const lat=Number(row[2]);
-    const lon=Number(row[3]);
-    const countryCode=String(row[4]||'').toUpperCase();
+    const id=Number(row[0]);const name=String(row[1]||'').trim();const lat=Number(row[2]);const lon=Number(row[3]);const countryCode=String(row[4]||'').toUpperCase();
     if(!Number.isInteger(id)||!name||!Number.isFinite(lat)||!Number.isFinite(lon)||lat< -90||lat>90||lon< -180||lon>180||!/^[A-Z]{2}$/.test(countryCode))throw new Error(`Ortregistret innehåller ogiltig data vid ${name||id||'okänd ort'}.`);
     countries.add(countryCode);
-    mapped.push({
-      id:String(id),name,lat,lon,countryCode,country:countryCode,region:String(row[6]||''),population:Number(row[7])||0,featureCode:String(row[8]||''),
-      searchName:String(row[9]||norm(name)),aliases:String(row[10]||'').split('\u0001').filter(Boolean)
-    });
+    mapped.push({id:String(id),name,lat,lon,countryCode,country:countryCode,region:String(row[6]||''),population:Number(row[7])||0,featureCode:String(row[8]||''),searchName:String(row[9]||norm(name)),aliases:String(row[10]||'').split('\u0001').filter(Boolean)});
   }
 
   assertDatasetManifest(manifest,{count:mapped.length,countryCount:countries.size,bytes:integrity.bytes,sha256:integrity.sha256});
-  places=mapped;
-  rebuildSearchIndex();
-  source='full';
-  activeManifest=manifest;
-  return {count:places.length,source,manifest};
+  places=mapped;rebuildSearchIndex();source='full';activeManifest=manifest;return {count:places.length,source,manifest};
 }
 
 function scorePlace(place,q){
-  const canonical=place.searchName||norm(place.name);
-  const words=canonical.split(' ');
-  let score=0;
-  if(canonical===q)score=100;
-  else if(canonical.startsWith(q))score=90;
-  else if(words.some(word=>word.startsWith(q)))score=84;
-  else if(canonical.includes(q))score=60;
-
+  const canonical=place.searchName||norm(place.name);const words=canonical.split(' ');let score=0;
+  if(canonical===q)score=100;else if(canonical.startsWith(q))score=90;else if(words.some(word=>word.startsWith(q)))score=84;else if(canonical.includes(q))score=60;
   for(const alias of place.aliases||[]){
-    if(alias===q)score=Math.max(score,96);
-    else if(alias.startsWith(q))score=Math.max(score,88);
-    else if(alias.split(' ').some(word=>word.startsWith(q)))score=Math.max(score,82);
-    else if(alias.includes(q))score=Math.max(score,56);
+    if(alias===q)score=Math.max(score,96);else if(alias.startsWith(q))score=Math.max(score,88);else if(alias.split(' ').some(word=>word.startsWith(q)))score=Math.max(score,82);else if(alias.includes(q))score=Math.max(score,56);
   }
   return score;
 }
 
 export function searchPlaces(query,limit=12){
-  const q=norm(query);
-  if(!q)return [];
-  const bucket=q.length>1?(buckets2.get(q.slice(0,2))||[]):(buckets1.get(q[0])||[]);
-  const seen=new Set();
-  const hits=[];
-  for(const place of bucket){
-    if(seen.has(place.id))continue;
-    seen.add(place.id);
-    const score=scorePlace(place,q);
-    if(score)hits.push({place,score});
-  }
-  return hits
-    .sort((a,b)=>b.score-a.score||b.place.population-a.place.population||a.place.name.localeCompare(b.place.name,'sv'))
-    .slice(0,limit)
-    .map(item=>item.place);
+  const q=norm(query);if(!q)return [];
+  const bucket=q.length>1?(buckets2.get(q.slice(0,2))||[]):(buckets1.get(q[0])||[]);const seen=new Set();const hits=[];
+  for(const place of bucket){if(seen.has(place.id))continue;seen.add(place.id);const score=scorePlace(place,q);if(score)hits.push({place,score})}
+  return hits.sort((a,b)=>b.score-a.score||b.place.population-a.place.population||a.place.name.localeCompare(b.place.name,'sv')).slice(0,limit).map(item=>item.place);
 }
 
-export function dataSource(){return source;}
-export function dataManifest(){return activeManifest;}
+export function placeById(id){return byId.get(String(id))||null}
+export function dataSource(){return source}
+export function dataManifest(){return activeManifest}
