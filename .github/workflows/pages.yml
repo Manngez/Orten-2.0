@@ -26,8 +26,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Bygg globalt ortregister
-        run: node scripts/build-world-data.mjs
+      - name: Bygg eller återanvänd globalt ortregister
+        shell: bash
+        run: |
+          set -e
+          if node scripts/build-world-data.mjs; then
+            echo "GeoNames-data byggdes på nytt."
+          else
+            echo "GeoNames kunde inte hämtas. Återanvänder senast publicerade fulla ortregister."
+            curl -fsSL --retry 3 --retry-delay 2 "https://manngez.github.io/Orten-2.0/data/world-places.json" -o data/world-places.json
+            curl -fsSL --retry 3 --retry-delay 2 "https://manngez.github.io/Orten-2.0/data/world-meta.json" -o data/world-meta.json
+          fi
       - name: Validera världsdatan
         run: node scripts/validate-world-data.mjs
       - name: Kontrollera JavaScript-syntax
@@ -54,20 +63,32 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Bygg globalt ortregister för release
-        run: node scripts/build-world-data.mjs
+      - name: Bygg eller återanvänd globalt ortregister för release
+        shell: bash
+        run: |
+          set -e
+          if node scripts/build-world-data.mjs; then
+            echo "GeoNames-data byggdes på nytt för releasen."
+          else
+            echo "GeoNames kunde inte hämtas. Återanvänder senast publicerade fulla ortregister."
+            curl -fsSL --retry 3 --retry-delay 2 "https://manngez.github.io/Orten-2.0/data/world-places.json" -o data/world-places.json
+            curl -fsSL --retry 3 --retry-delay 2 "https://manngez.github.io/Orten-2.0/data/world-meta.json" -o data/world-meta.json
+          fi
       - name: Validera release-datan igen
         run: node scripts/validate-world-data.mjs
       - name: Kör release quality gate igen
         run: node scripts/quality-gate.mjs
       - name: Versionsmärk klientfiler
+        shell: bash
         run: |
           BUILD="${GITHUB_SHA::12}"
-          sed -i "s|href=\"styles.css\"|href=\"styles.css?v=$BUILD\"|" index.html
-          sed -i "s|src=\"data.js\"|src=\"data.js?v=$BUILD\"|" index.html
-          sed -i "s|src=\"app.js\"|src=\"app.js?v=$BUILD\"|" index.html
+          sed -i -E "s|href=\"styles.css(\?v=[^\"]*)?\"|href=\"styles.css?v=$BUILD\"|" index.html
+          sed -i -E "s|src=\"data.js(\?v=[^\"]*)?\"|src=\"data.js?v=$BUILD\"|" index.html
+          sed -i -E "s|src=\"app.js(\?v=[^\"]*)?\"|src=\"app.js?v=$BUILD\"|" index.html
+          sed -i -E "s|href=\"history.css(\?v=[^\"]*)?\"|href=\"history.css?v=$BUILD\"|" spelhistorik/index.html
+          sed -i -E "s|src=\"history.js(\?v=[^\"]*)?\"|src=\"history.js?v=$BUILD\"|" spelhistorik/index.html
           for css in styles-base.css styles-game.css styles-responsive.css styles-atlas.css styles-highscore.css; do
-            sed -i "s|\"./$css\"|\"./$css?v=$BUILD\"|" styles.css
+            sed -i -E "s|\"./$css(\?v=[^\"]*)?\"|\"./$css?v=$BUILD\"|" styles.css
           done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
