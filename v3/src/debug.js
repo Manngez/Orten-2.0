@@ -34,7 +34,17 @@ export function createOnlineDiagnostics({enabled=false,getSnapshot=()=>null,getS
   let collapsed=false;
 
   function record(type,detail=''){
-    events.push({at:Date.now(),type:String(type||'event'),detail:String(detail||'')});
+    type=String(type||'event');detail=String(detail||'');
+    const snapshot=type==='status'?(getSnapshot?.()||{}):null;
+    if(snapshot?.status==='reconnecting'){
+      const attempt=Number(snapshot.reconnectAttempt)||0;
+      const max=Number(snapshot.maxReconnectAttempts)||0;
+      const reason=String(snapshot.reconnectReason||'network');
+      detail=`${detail}${detail?' · ':''}försök ${attempt||'väntar'}${max?`/${max}`:''} · ${reason}`;
+    }else if(snapshot?.status==='connected'&&snapshot.connectionId){
+      detail=`${detail}${detail?' · ':''}${shortId(snapshot.connectionId)}`;
+    }
+    events.push({at:Date.now(),type,detail});
     if(events.length>32)events.splice(0,events.length-32);
     refresh();
   }
@@ -44,12 +54,19 @@ export function createOnlineDiagnostics({enabled=false,getSnapshot=()=>null,getS
     const state=getState?.()||null;
     const players=(snapshot.players||[]).map(player=>`${player.name}:${player.connected===false?'OFF':'ON'}`).join(', ')||'—';
     const current=state?.players?.[state.turn]?.name||'—';
+    const reconnect=snapshot.status==='reconnecting'
+      ?`${Number(snapshot.reconnectAttempt)||'väntar'}/${Number(snapshot.maxReconnectAttempts)||'?'} · ${snapshot.reconnectReason||'network'}`
+      :'nej';
     const lines=[
       `roll: ${snapshot.role||'offline'}`,
       `status: ${snapshot.status||'idle'}`,
       `rum: ${snapshot.roomCode||'—'}`,
       `playerId: ${shortId(snapshot.playerId)}`,
+      `session: ${shortId(snapshot.sessionId)}`,
+      `connection: ${shortId(snapshot.connectionId)}`,
       `revision: ${Number.isInteger(snapshot.revision)?snapshot.revision:'—'}`,
+      `server revision: ${Number.isInteger(snapshot.serverRevision)?snapshot.serverRevision:'—'}`,
+      `reconnect: ${reconnect}`,
       `pending move: ${snapshot.pending?'JA':'nej'}`,
       `kan spela: ${getCanMove?.()?'JA':'nej'}`,
       `spelare: ${players}`,
