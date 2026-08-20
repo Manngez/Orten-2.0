@@ -2,6 +2,8 @@ import {intersectionOf,unwrapLon} from './geometry.js';
 
 const clone=value=>structuredClone(value);
 const MODES=new Set(['classic','solo','duel']);
+const finiteCoord=value=>Number.isFinite(Number(value));
+const validLatLon=point=>!!point&&finiteCoord(point.lat)&&finiteCoord(point.lon)&&Number(point.lat)>=-90&&Number(point.lat)<=90&&Number(point.lon)>=-180&&Number(point.lon)<=180;
 
 export function createGame({mode='classic',players=[],playerIds=[]}={}){
   if(!MODES.has(mode))throw new Error('Okänt spelläge.');
@@ -22,7 +24,9 @@ export function isGameState(value){
   if(!Array.isArray(value.players)||!value.players.length||!Array.isArray(value.places)||!Array.isArray(value.segments))return false;
   if(!Number.isInteger(value.turn)||value.turn<0||value.turn>=value.players.length)return false;
   if(value.players.some((p,index)=>!p||p.id!==index||typeof p.name!=='string'||!Number.isInteger(p.moves)||p.moves<0))return false;
-  if(value.places.some(p=>!p||typeof p.id!=='string'||typeof p.name!=='string'||!Number.isFinite(Number(p.lat))||!Number.isFinite(Number(p.lon))||!Number.isInteger(p.playerIndex)))return false;
+  if(value.places.some(p=>!p||typeof p.id!=='string'||typeof p.name!=='string'||!validLatLon(p)||!Number.isInteger(p.playerIndex)||p.playerIndex<0||p.playerIndex>=value.players.length))return false;
+  if(value.segments.some(segment=>!segment||!validLatLon(segment.a)||!validLatLon(segment.b)||!Number.isInteger(segment.playerIndex)||segment.playerIndex<0||segment.playerIndex>=value.players.length))return false;
+  if(value.crossing&&( !finiteCoord(value.crossing.lat)||!finiteCoord(value.crossing.lon)||Number(value.crossing.lat)<-90||Number(value.crossing.lat)>90||Number(value.crossing.lon)<-180||Number(value.crossing.lon)>180))return false;
   return true;
 }
 
