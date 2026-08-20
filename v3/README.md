@@ -10,6 +10,7 @@ Orten 3.0 är en ren ombyggnad som utvecklas parallellt med Orten 2.0.
 - Ortdata ligger bakom ett eget datalager och får inte tyst falla tillbaka till en liten produktionsdatabas.
 - Historik och nätverk ska konsumera spelstate i stället för att återskapa spelregler.
 - Kartan visualiserar state men bestämmer aldrig spelreglerna.
+- Onlinegäster skickar dragförslag; värden är auktoritativ och kör draget genom samma `playPlace()` som lokalt spel.
 
 ## Nuvarande milstolpe
 
@@ -24,6 +25,9 @@ V3 har nu också:
 - Klickbara spelade orter för snabb återfokusering.
 - Indexerad ortsökning som slipper skanna 150 000+ orter för varje tangenttryckning.
 - Stöd för GeoNames-alias och accentoberoende sökning, till exempel `umea` → `Umeå`.
+- Ett versionsmärkt onlineprotokoll med state-revisioner och skydd mot gamla state-paket.
+- Host-auktoritativa onlinedrag där fel spelare inte kan göra drag utanför sin tur.
+- Validering av inkommande spelstate innan en gäst accepterar det.
 
 Det lilla utvecklingsregistret finns kvar endast i explicit demoläge via `?demo=1`. Ett vanligt nätverks- eller datafel får aldrig tyst göra V3 spelbart med ofullständig data.
 
@@ -43,10 +47,19 @@ Det lilla utvecklingsregistret finns kvar endast i explicit demoläge via `?demo
 
 GitHub Pages-flödet kör V3:s tester, bygger hela GeoNames-registret och validerar manifest + datafil innan publicering.
 
+## Onlinekontrakt
+
+`src/online-protocol.js` är transportoberoende. Det definierar två centrala meddelanden:
+
+- `MOVE`: gästen föreslår en ort tillsammans med sitt spelar-id och ett unikt drag-id.
+- `STATE`: värden skickar ett validerat komplett spelstate med monoton revision och eventuell kvittens av drag-id.
+
+Värden kontrollerar att `playerId` motsvarar spelaren vars tur det är innan `playPlace()` får köras. Gästen accepterar bara nyare revisioner och vägrar ogiltigt state. Det innebär att PeerJS/WebRTC, återanslutning och framtida transport kan bytas utan att spelreglerna behöver ändras.
+
 ## Nästa steg
 
-1. Online-transport som synkar exakt samma state som lokalspelsmotorn.
-2. En gemensam matchjournal för start, progress, avslut och replay.
-3. Återanslutning ovanpå state-synkningen utan separata onlineregler.
-4. Gatduell som separat regelmodul ovanpå samma sessions- och nätverkslager.
-5. Fler spelinställningar först när kärnflödet är stabilt och enkelt.
+1. Koppla PeerJS/WebRTC-transport till det nya `MOVE`/`STATE`-protokollet.
+2. Bygg den enkla V3-ingången `En enhet` / `Online`, med `Skapa rum` eller `Anslut till rum`.
+3. Återanslutning genom att gästen begär senaste state-revision från värden.
+4. En gemensam matchjournal för start, progress, avslut och replay.
+5. Gatduell som separat regelmodul ovanpå samma sessions- och nätverkslager.
