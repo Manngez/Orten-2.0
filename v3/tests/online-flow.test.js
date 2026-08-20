@@ -38,7 +38,11 @@ const place=(id,name,lat,lon)=>({id,name,lat,lon,countryCode:'SE',country:'Sveri
 test('skapa rum, anslut, starta och synka drag åt båda håll',async()=>{
   registry.clear();guestCounter=0;globalThis.Peer=FakePeer;
   let hostState=null;let guestState=null;
-  const host=createOnlineController({onState:event=>{hostState=event.state}});
+  const trusted=new Map([
+    ['umea',place('umea','Umeå',63.8258,20.263)],
+    ['stockholm',place('stockholm','Stockholm',59.3293,18.0686)]
+  ]);
+  const host=createOnlineController({resolvePlace:id=>trusted.get(String(id))||null,onState:event=>{hostState=event.state}});
   const guest=createOnlineController({onState:event=>{guestState=event.state}});
 
   await host.createRoom({name:'Anna',code:'ABCDE',mode:'classic'});
@@ -57,18 +61,22 @@ test('skapa rum, anslut, starta och synka drag åt båda håll',async()=>{
   assert.equal(host.canMove(),true);
   assert.equal(guest.canMove(),false);
 
-  host.submitMove(place('umea','Umeå',63.8258,20.263));
+  host.submitMove(place('umea','Manipulerat namn',0,0));
   await tick();await tick();
   assert.equal(hostState.places.length,1);
+  assert.equal(hostState.places[0].name,'Umeå');
+  assert.equal(hostState.places[0].lat,63.8258);
   assert.equal(guestState.places.length,1);
   assert.equal(host.canMove(),false);
   assert.equal(guest.canMove(),true);
 
-  guest.submitMove(place('stockholm','Stockholm',59.3293,18.0686));
+  guest.submitMove(place('stockholm','Stockholm',0,0));
   await tick();await tick();
   assert.equal(hostState.places.length,2);
   assert.equal(guestState.places.length,2);
   assert.equal(hostState.places[1].name,'Stockholm');
+  assert.equal(hostState.places[1].lat,59.3293);
+  assert.equal(hostState.places[1].lon,18.0686);
   assert.equal(host.snapshot().revision,2);
   assert.equal(guest.snapshot().revision,2);
 
