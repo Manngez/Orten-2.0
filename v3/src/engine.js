@@ -1,13 +1,29 @@
 import {intersectionOf,unwrapLon} from './geometry.js';
 
 const clone=value=>structuredClone(value);
+const MODES=new Set(['classic','solo','duel']);
 
-export function createGame({mode='classic',players=[]}={}){
-  const cleanPlayers=players.map((name,index)=>({id:index,name:String(name||`Spelare ${index+1}`).trim()||`Spelare ${index+1}`,moves:0}));
+export function createGame({mode='classic',players=[],playerIds=[]}={}){
+  if(!MODES.has(mode))throw new Error('Okänt spelläge.');
+  const cleanPlayers=players.map((name,index)=>({
+    id:index,
+    onlineId:playerIds[index]?String(playerIds[index]):null,
+    name:String(name||`Spelare ${index+1}`).trim()||`Spelare ${index+1}`,
+    moves:0
+  }));
   if(mode==='solo'&&cleanPlayers.length!==1)throw new Error('Solo kräver exakt en spelare.');
   if(mode==='duel'&&cleanPlayers.length!==2)throw new Error('Duell kräver exakt två spelare.');
   if(!cleanPlayers.length)throw new Error('Minst en spelare krävs.');
   return {version:2,mode,status:'playing',turn:0,players:cleanPlayers,places:[],segments:[],crossing:null,winner:null};
+}
+
+export function isGameState(value){
+  if(!value||value.version!==2||!MODES.has(value.mode)||!['playing','finished'].includes(value.status))return false;
+  if(!Array.isArray(value.players)||!value.players.length||!Array.isArray(value.places)||!Array.isArray(value.segments))return false;
+  if(!Number.isInteger(value.turn)||value.turn<0||value.turn>=value.players.length)return false;
+  if(value.players.some((p,index)=>!p||p.id!==index||typeof p.name!=='string'||!Number.isInteger(p.moves)||p.moves<0))return false;
+  if(value.places.some(p=>!p||typeof p.id!=='string'||typeof p.name!=='string'||!Number.isFinite(Number(p.lat))||!Number.isFinite(Number(p.lon))||!Number.isInteger(p.playerIndex)))return false;
+  return true;
 }
 
 function playerLastPlace(state,playerIndex){
@@ -67,6 +83,7 @@ function nextTurn(state){
 }
 
 export function playPlace(inputState,rawPlace){
+  if(!isGameState(inputState))throw new Error('Ogiltigt spelstate.');
   if(inputState.status!=='playing')throw new Error('Spelet är avslutat.');
   const state=clone(inputState);
   const place=preparePlace(state,rawPlace);
