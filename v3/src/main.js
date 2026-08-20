@@ -1,5 +1,5 @@
 import {createGame,playPlace,ruleText} from './engine.js';
-import {loadPlaces,searchPlaces,placeById} from './data.js';
+import {loadPlaces,searchPlaces,placeById,countryOptions} from './data.js';
 import {createGameMap} from './map.js';
 import {createOnlineController} from './online.js';
 import {createOnlineDiagnostics} from './debug.js';
@@ -21,11 +21,21 @@ let journal=null;
 let journalSaved=false;
 let replayJournal=null;
 let replayIndex=0;
+let availableCountryList=[];
+
+const EUROPE=['AL','AD','AT','AX','BY','BE','BA','BG','HR','CY','CZ','DK','EE','FO','FI','FR','DE','GI','GR','GG','HU','IS','IE','IM','IT','JE','XK','LV','LI','LT','LU','MT','MD','MC','ME','NL','MK','NO','PL','PT','RO','RU','SM','RS','SK','SI','ES','SE','CH','TR','UA','GB','VA'];
+const COUNTRY_PRESETS={sweden:['SE'],nordic:['SE','NO','FI','DK','IS','FO','AX'],europe:EUROPE,world:[]};
+const pickerState={
+  local:{scope:'sweden',custom:new Set(['SE']),query:''},
+  online:{scope:'sweden',custom:new Set(['SE']),query:''}
+};
 
 const modeName=value=>({classic:'Klassisk',solo:'Solo',duel:'Duell'})[value]||value;
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const statusName=value=>({idle:'Inte ansluten',connecting:'Ansluter…',connected:'Ansluten',reconnecting:'Återansluter…',error:'Anslutningsfel'})[value]||value;
 const dateLabel=value=>{try{return new Date(value).toLocaleString('sv-SE',{dateStyle:'short',timeStyle:'short'})}catch{return ''}};
+const sortedCodes=value=>[...(value||[])].map(code=>String(code).toUpperCase()).filter(Boolean).sort();
+const sameCodes=(a,b)=>{const x=sortedCodes(a),y=sortedCodes(b);return x.length===y.length&&x.every((code,index)=>code===y[index])};
 
 function setScreen(name){document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));$(name).classList.add('active')}
 function ensureMap(){if(!gameMap)gameMap=createGameMap($('map'));gameMap.invalidate();return gameMap}
@@ -34,6 +44,42 @@ function networkActive(){return online.snapshot().role!=='offline'}
 function journalOwner(){const role=online.snapshot().role;return role==='offline'||role==='host'}
 function historyItems(){return loadMatchHistory()}
 function updateHistoryEntry(){$('historyEntry').classList.toggle('hidden',historyItems().length===0)}
+function countriesFor(kind){const picker=pickerState[kind];return picker.scope==='custom'?[...picker.custom]:[...(COUNTRY_PRESETS[picker.scope]||[])]}
+function countrySelectionValid(kind){const picker=pickerState[kind];return picker.scope!=='custom'||picker.custom.size>0}
+function countryName(code){return availableCountryList.find(item=>item.code===code)?.name||code}
+function countryLabel(countries=[]){
+  const codes=sortedCodes(countries);
+  if(!codes.length)return 'Världen';
+  if(sameCodes(codes,COUNTRY_PRESETS.sweden))return 'Sverige';
+  if(sameCodes(codes,COUNTRY_PRESETS.nordic))return 'Norden';
+  if(sameCodes(codes,COUNTRY_PRESETS.europe))return 'Europa';
+  if(codes.length===1)return countryName(codes[0]);
+  return `${codes.length} länder`;
+}
+
+function syncOnlineCountries(){
+  if(online.snapshot().role==='host')online.setCountries(countriesFor('online'));
+}
+
+function renderCountryPicker(kind){
+  const root=$(`${kind}CountryPicker`);if(!root)return;
+  const picker=pickerState[kind];const selected=countriesFor(kind);const customSelected=new Set(picker.custom);const query=picker.query.trim().toLocaleLowerCase('sv-SE');
+  const presets=[['sweden','🇸🇪 Sverige'],['nordic','❄️ Norden'],['europe','🌍 Europa'],['world','🌐 Världen'],['custom','＋ Välj länder']];
+  const options=availableCountryList.filter(item=>!query||item.name.toLocaleLowerCase('sv-SE').includes(query)||item.code.toLocaleLowerCase('sv-SE').includes(query));
+  const summary=picker.scope==='custom'&&!picker.custom.size?'Välj minst ett land':countryLabel(selected);
+  root.innerHTML=`<div class="country-presets">${presets.map(([key,label])=>`<button type="button" class="country-preset ${picker.scope===key?'selected':''}" data-country-scope="${key}">${label}</button>`).join('')}</div><p class="country-summary">Spelområde: <strong>${esc(summary)}</strong></p>${picker.scope==='custom'?`<div class="country-custom"><input class="country-search" data-country-search type="search" autocomplete="off" placeholder="Sök land…" value="${esc(picker.query)}"><div class="country-list">${options.length?options.map(item=>`<button type="button" class="country-choice ${customSelected.has(item.code)?'selected':''}" data-country-code="${item.code}"><span class="country-check">${customSelected.has(item.code)?'✓':''}</span><b>${esc(item.name)}</b><small>${item.code}</small></button>`).join(''):'<div class="country-empty">Inga länder matchar sökningen.</div>'}</div></div>`:''}`;
+  root.querySelectorAll('[data-country-scope]').forEach(button=>button.addEventListener('click',()=>{
+    const next=button.dataset.countryScope;
+    if(next==='custom'&&picker.scope!=='custom')picker.custom=new Set(countriesFor(kind));
+    picker.scope=next;picker.query='';renderCountryPicker(kind);if(kind==='online')syncOnlineCountries();
+  }));
+  root.querySelectorAll('[data-country-code]').forEach(button=>button.addEventListener('click',()=>{
+    const code=button.dataset.countryCode;if(picker.custom.has(code))picker.custom.delete(code);else picker.custom.add(code);renderCountryPicker(kind);if(kind==='online')syncOnlineCountries();
+  }));
+  const search=root.querySelector('[data-country-search]');if(search)search.addEventListener('input',event=>{
+    picker.query=event.target.value;renderCountryPicker(kind);const next=root.querySelector('[data-country-search]');if(next){next.focus();next.setSelectionRange(next.value.length,next.value.length)}
+  });
+}
 
 function persistJournal(){
   if(!journal||journalSaved)return;
@@ -72,7 +118,7 @@ function renderState({forceMapFit=false}={}){
   if(!state)return;
   const isReplay=!!replayJournal;
   const onlineState=online.snapshot();const isOnline=!isReplay&&onlineState.role!=='offline';const canMove=!isReplay&&(!isOnline||online.canMove());const current=state.players[state.turn];
-  $('modeBadge').textContent=modeName(state.mode);$('networkBadge').classList.toggle('hidden',!isOnline);if(isOnline)$('networkBadge').textContent=`● ${onlineState.roomCode} · ${statusName(onlineState.status)}`;
+  $('modeBadge').textContent=`${modeName(state.mode)} · ${countryLabel(state.allowedCountries||[])}`;$('networkBadge').classList.toggle('hidden',!isOnline);if(isOnline)$('networkBadge').textContent=`● ${onlineState.roomCode} · ${statusName(onlineState.status)}`;
   $('turnName').textContent=isReplay?'Repris':state.status==='finished'?'Match slut':current.name;
   $('score').innerHTML=state.players.map((p,i)=>`<div class="player-score ${!isReplay&&state.status==='playing'&&state.turn===i?'active':''}"><span>${esc(p.name)}</span><b>${p.moves}</b></div>`).join('');
   $('route').innerHTML=state.places.map((p,index)=>`<button type="button" class="route-place p${p.playerIndex}" data-place-index="${index}">${esc(p.name)}</button>`).join('');
@@ -91,6 +137,7 @@ function renderState({forceMapFit=false}={}){
 }
 
 function clearSearch(){$('placeInput').value='';$('results').innerHTML=''}
+function searchCurrentPlaces(query,limit=12){return searchPlaces(query,limit,{countries:state?.allowedCountries||[]})}
 function choose(place){
   if(replayJournal||!state||state.status!=='playing')return;
   try{
@@ -148,9 +195,11 @@ function renderLobby(snapshot=online.snapshot()){
   $('lobbyPlayers').innerHTML=snapshot.players.map((player,index)=>`<div class="lobby-player"><span class="player-dot p${index}"></span><div><b>${esc(player.name)}</b><small>${player.id===snapshot.playerId?'Du':player.id==='host'?'Värd':'Ansluten'}</small></div><strong>${player.connected===false?'×':'✓'}</strong></div>`).join('');
   const host=snapshot.role==='host';$('hostSettings').classList.toggle('hidden',!host);$('guestWaiting').classList.toggle('hidden',host);
   document.querySelectorAll('[data-online-mode]').forEach(button=>button.classList.toggle('selected',button.dataset.onlineMode===snapshot.mode));
-  const start=$('startOnline');start.disabled=!host||!roomReady||snapshot.status!=='connected'||snapshot.started;
-  start.textContent=snapshot.started?'Matchen är startad':roomReady?'Starta match':snapshot.players.length===2?'Väntar på återanslutning…':'Väntar på spelare…';
-  $('lobbyMessage').textContent=snapshot.status==='reconnecting'?'Försöker återansluta automatiskt…':snapshot.role==='guest'?'Du är inne i rummet. Värden väljer regler och startar.':'Dela rumskoden eller länken med den andra spelaren.';
+  if(host)renderCountryPicker('online');
+  if($('guestCountrySummary'))$('guestCountrySummary').textContent=`Område: ${countryLabel(snapshot.countries||[])}`;
+  const start=$('startOnline');const validCountries=countrySelectionValid('online');start.disabled=!host||!roomReady||snapshot.status!=='connected'||snapshot.started||!validCountries;
+  start.textContent=snapshot.started?'Matchen är startad':!validCountries?'Välj minst ett land':roomReady?'Starta match':snapshot.players.length===2?'Väntar på återanslutning…':'Väntar på spelare…';
+  $('lobbyMessage').textContent=snapshot.status==='reconnecting'?'Försöker återansluta automatiskt…':snapshot.role==='guest'?'Du är inne i rummet. Värden väljer regler, område och startar.':'Dela rumskoden eller länken med den andra spelaren.';
   diagnostics?.refresh();
 }
 
@@ -180,17 +229,17 @@ if(debugMode){
   document.addEventListener('visibilitychange',()=>diagnostics.record('visibility',document.visibilityState));
 }
 
-$('localEntry').addEventListener('click',()=>{if(ready){playContext='local';setScreen('home')}});$('onlineEntry').addEventListener('click',()=>{if(ready){playContext='online';showOnlineChoice();setScreen('online')}});
+$('localEntry').addEventListener('click',()=>{if(ready){playContext='local';renderCountryPicker('local');setScreen('home')}});$('onlineEntry').addEventListener('click',()=>{if(ready){playContext='online';showOnlineChoice();setScreen('online')}});
 $('historyEntry').addEventListener('click',showHistory);$('historyBack').addEventListener('click',()=>setScreen('entry'));
 $('homeBack').addEventListener('click',()=>setScreen('entry'));$('onlineBack').addEventListener('click',()=>{online.leave();resetJournal();showOnlineChoice();setScreen('entry')});
 
 $('modeGrid').addEventListener('click',event=>{const button=event.target.closest('[data-mode]');if(!button)return;mode=button.dataset.mode;document.querySelectorAll('#modeGrid [data-mode]').forEach(el=>el.classList.toggle('selected',el===button));rebuildNames()});
-$('placeInput').addEventListener('input',()=>{const hits=searchPlaces($('placeInput').value);$('results').innerHTML=hits.map((p,i)=>`<button class="result" type="button" data-index="${i}"><b>${esc(p.name)}</b><small>${esc(p.region?`${p.region} · ${p.countryCode}`:p.country||p.countryCode)}</small></button>`).join('');$('results').querySelectorAll('[data-index]').forEach((button,i)=>button.addEventListener('click',()=>choose(hits[i])))});
-$('placeForm').addEventListener('submit',event=>{event.preventDefault();if(replayJournal)return;const hit=searchPlaces($('placeInput').value,1)[0];if(hit)choose(hit)});
+$('placeInput').addEventListener('input',()=>{const hits=searchCurrentPlaces($('placeInput').value);$('results').innerHTML=hits.map((p,i)=>`<button class="result" type="button" data-index="${i}"><b>${esc(p.name)}</b><small>${esc(p.region?`${p.region} · ${p.countryCode}`:p.country||p.countryCode)}</small></button>`).join('');$('results').querySelectorAll('[data-index]').forEach((button,i)=>button.addEventListener('click',()=>choose(hits[i])))});
+$('placeForm').addEventListener('submit',event=>{event.preventDefault();if(replayJournal)return;const hit=searchCurrentPlaces($('placeInput').value,1)[0];if(hit)choose(hit)});
 
 $('start').addEventListener('click',()=>{
   if(!ready)return;const count=mode==='solo'?1:2;const players=Array.from({length:count},(_,i)=>String($(`name${i}`)?.value||`Spelare ${i+1}`).trim()||`Spelare ${i+1}`);
-  try{playContext='local';replayJournal=null;setReplayUi(false);state=createGame({mode,players});resetJournal();beginJournal(state);setScreen('game');ensureMap();renderState({forceMapFit:true});$('placeInput').focus()}
+  try{if(!countrySelectionValid('local'))throw new Error('Välj minst ett land.');playContext='local';replayJournal=null;setReplayUi(false);state=createGame({mode,players,allowedCountries:countriesFor('local')});resetJournal();beginJournal(state);setScreen('game');ensureMap();renderState({forceMapFit:true});$('placeInput').focus()}
   catch(error){setScreen('home');$('dataStatus').textContent=`⛔ Spelet kunde inte starta: ${error.message}`;$('dataStatus').className='data-status bad'}
 });
 
@@ -198,11 +247,11 @@ $('showCreate').addEventListener('click',()=>{$('onlineChoice').classList.add('h
 $('showJoin').addEventListener('click',()=>{$('onlineChoice').classList.add('hidden');$('joinForm').classList.remove('hidden');$('joinCode').focus()});
 document.querySelectorAll('[data-online-choice]').forEach(button=>button.addEventListener('click',showOnlineChoice));$('newCode').addEventListener('click',()=>{$('createCode').value=online.makeRoomCode()});
 
-$('createRoom').addEventListener('click',async()=>{if(!ready)return;resetJournal();diagnostics?.record('room:create',$('createCode').value);$('onlineStatus').textContent='Skapar rum…';$('createRoom').disabled=true;try{await online.createRoom({name:$('hostName').value,code:$('createCode').value,mode:'classic'});setScreen('lobby');renderLobby()}catch(error){online.leave();diagnostics?.record('room:create:error',error.message);$('onlineStatus').textContent=`⛔ ${error.message}`}finally{$('createRoom').disabled=false}});
+$('createRoom').addEventListener('click',async()=>{if(!ready)return;resetJournal();diagnostics?.record('room:create',$('createCode').value);$('onlineStatus').textContent='Skapar rum…';$('createRoom').disabled=true;try{await online.createRoom({name:$('hostName').value,code:$('createCode').value,mode:'classic',countries:countriesFor('online')});setScreen('lobby');renderLobby()}catch(error){online.leave();diagnostics?.record('room:create:error',error.message);$('onlineStatus').textContent=`⛔ ${error.message}`}finally{$('createRoom').disabled=false}});
 $('joinRoom').addEventListener('click',async()=>{if(!ready)return;resetJournal();diagnostics?.record('room:join',$('joinCode').value);$('onlineStatus').textContent='Ansluter…';$('joinRoom').disabled=true;try{await online.joinRoom({name:$('guestName').value,code:$('joinCode').value});setScreen('lobby');renderLobby()}catch(error){online.leave();diagnostics?.record('room:join:error',error.message);$('onlineStatus').textContent=`⛔ ${error.message}`}finally{$('joinRoom').disabled=false}});
 
 $('onlineModeGrid').addEventListener('click',event=>{const button=event.target.closest('[data-online-mode]');if(!button)return;online.setMode(button.dataset.onlineMode);diagnostics?.record('mode',button.dataset.onlineMode);renderLobby()});
-$('startOnline').addEventListener('click',()=>{try{resetJournal();diagnostics?.record('match','start');online.startGame()}catch(error){diagnostics?.record('match:error',error.message);$('lobbyMessage').textContent=`⛔ ${error.message}`}});
+$('startOnline').addEventListener('click',()=>{try{if(!countrySelectionValid('online'))throw new Error('Välj minst ett land.');resetJournal();diagnostics?.record('match','start');online.startGame()}catch(error){diagnostics?.record('match:error',error.message);$('lobbyMessage').textContent=`⛔ ${error.message}`}});
 $('leaveLobby').addEventListener('click',()=>{abandonJournal();diagnostics?.record('room','leave');online.leave();resetJournal();showOnlineChoice();setScreen('online')});
 $('copyCode').textContent='Dela rum';
 $('copyCode').addEventListener('click',async()=>{
@@ -233,6 +282,7 @@ $('route').addEventListener('click',event=>{const button=event.target.closest('[
 rebuildNames();$('createCode').value=online.makeRoomCode();if(requestedRoom){$('joinCode').value=requestedRoom;showOnlineChoice()}
 setReplayUi(false);updateHistoryEntry();$('localEntry').disabled=true;$('onlineEntry').disabled=true;
 loadPlaces({allowDemo:demoMode}).then(info=>{
+  availableCountryList=countryOptions();renderCountryPicker('local');renderCountryPicker('online');
   ready=true;$('start').disabled=false;$('localEntry').disabled=false;$('onlineEntry').disabled=false;diagnostics?.record('data',`${info.source} · ${info.count}`);updateHistoryEntry();
   if(info.source==='full'){$('dataStatus').textContent=`✓ ${info.count.toLocaleString('sv-SE')} verifierade orter`;$('dataStatus').className='data-status ok'}else{$('dataStatus').textContent=`⚠ Demo · ${info.count} testorter`;$('dataStatus').className='data-status warn'}
   if(requestedRoom){playContext='online';setScreen('online');$('onlineChoice').classList.add('hidden');$('joinForm').classList.remove('hidden');diagnostics?.record('deep-link',requestedRoom)}

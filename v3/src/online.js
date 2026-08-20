@@ -11,6 +11,7 @@ const clone=value=>structuredClone(value);
 const cleanName=value=>String(value||'').trim().slice(0,24);
 const cleanRoom=value=>String(value||'').toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6);
 const cleanPlayerId=value=>String(value||'').trim().slice(0,80);
+const cleanCountries=value=>[...new Set((Array.isArray(value)?value:[]).map(code=>String(code||'').trim().toUpperCase()).filter(code=>/^[A-Z]{2}$/.test(code)))];
 const roomPeerId=code=>`${ROOM_PREFIX}${cleanRoom(code).toLowerCase()}`;
 
 export function makeRoomCode(random=Math.random){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let out='';for(let i=0;i<5;i++)out+=chars[Math.floor(random()*chars.length)%chars.length];return out}
@@ -29,12 +30,12 @@ async function loadPeer(){
 export function createOnlineController(callbacks={}){
   const cb={onStatus:callbacks.onStatus||(()=>{}),onLobby:callbacks.onLobby||(()=>{}),onState:callbacks.onState||(()=>{}),onError:callbacks.onError||(()=>{}),onClosed:callbacks.onClosed||(()=>{})};
   const resolvePlace=typeof callbacks.resolvePlace==='function'?callbacks.resolvePlace:null;
-  const net={role:'offline',status:'idle',roomCode:'',playerId:'',name:'',mode:'classic',peer:null,hostConn:null,guestConnections:new Map(),players:[],state:null,revision:-1,serverRevision:-1,pendingMoveId:null,pendingMove:null,retries:0,reconnectAttempt:0,reconnectReason:'',reconnectTimer:null,sessionId:freshId('s'),connectionSeq:0,connectionId:'',started:false};
+  const net={role:'offline',status:'idle',roomCode:'',playerId:'',name:'',mode:'classic',countries:[],peer:null,hostConn:null,guestConnections:new Map(),players:[],state:null,revision:-1,serverRevision:-1,pendingMoveId:null,pendingMove:null,retries:0,reconnectAttempt:0,reconnectReason:'',reconnectTimer:null,sessionId:freshId('s'),connectionSeq:0,connectionId:'',started:false};
   const seenMoveIds=new Map();
-  const snapshot=()=>({role:net.role,status:net.status,roomCode:net.roomCode,playerId:net.playerId,name:net.name,mode:net.mode,players:clone(net.players),started:net.started,revision:net.revision,serverRevision:net.serverRevision,pending:!!net.pendingMoveId,reconnectAttempt:net.reconnectAttempt,reconnectReason:net.reconnectReason,sessionId:net.sessionId,connectionId:net.connectionId,maxReconnectAttempts:RETRY_DELAYS.length});
+  const snapshot=()=>({role:net.role,status:net.status,roomCode:net.roomCode,playerId:net.playerId,name:net.name,mode:net.mode,countries:clone(net.countries),players:clone(net.players),started:net.started,revision:net.revision,serverRevision:net.serverRevision,pending:!!net.pendingMoveId,reconnectAttempt:net.reconnectAttempt,reconnectReason:net.reconnectReason,sessionId:net.sessionId,connectionId:net.connectionId,maxReconnectAttempts:RETRY_DELAYS.length});
   const emitStatus=()=>cb.onStatus(snapshot());const emitLobby=()=>cb.onLobby(snapshot());const setStatus=(status,{force=false}={})=>{if(net.status===status&&!force)return;net.status=status;emitStatus()};
   const send=(conn,message)=>{if(conn?.open)conn.send(message)};const broadcast=message=>{for(const conn of net.guestConnections.values())send(conn,message)};
-  const lobbyMessage=()=>({protocol:ONLINE_PROTOCOL_VERSION,type:'LOBBY',roomCode:net.roomCode,mode:net.mode,started:net.started,players:clone(net.players)});const broadcastLobby=()=>{broadcast(lobbyMessage());emitLobby()};
+  const lobbyMessage=()=>({protocol:ONLINE_PROTOCOL_VERSION,type:'LOBBY',roomCode:net.roomCode,mode:net.mode,countries:clone(net.countries),started:net.started,players:clone(net.players)});const broadcastLobby=()=>{broadcast(lobbyMessage());emitLobby()};
 
   function clearReconnect(){if(net.reconnectTimer){clearTimeout(net.reconnectTimer);net.reconnectTimer=null}}
   function clearReconnectState(){clearReconnect();net.retries=0;net.reconnectAttempt=0;net.reconnectReason=''}
@@ -42,7 +43,7 @@ export function createOnlineController(callbacks={}){
   function markConnected(kind){clearReconnectState();nextConnectionId(kind);setStatus('connected',{force:true})}
   function clearPending(){net.pendingMoveId=null;net.pendingMove=null}
   function closePeer(){clearReconnect();try{net.hostConn?.close()}catch{}for(const conn of net.guestConnections.values())try{conn.close()}catch{}net.guestConnections.clear();net.hostConn=null;try{net.peer?.destroy()}catch{}net.peer=null}
-  function reset(){closePeer();seenMoveIds.clear();Object.assign(net,{role:'offline',status:'idle',roomCode:'',playerId:'',name:'',mode:'classic',players:[],state:null,revision:-1,serverRevision:-1,pendingMoveId:null,pendingMove:null,retries:0,reconnectAttempt:0,reconnectReason:'',connectionId:'',started:false});emitStatus();emitLobby()}
+  function reset(){closePeer();seenMoveIds.clear();Object.assign(net,{role:'offline',status:'idle',roomCode:'',playerId:'',name:'',mode:'classic',countries:[],players:[],state:null,revision:-1,serverRevision:-1,pendingMoveId:null,pendingMove:null,retries:0,reconnectAttempt:0,reconnectReason:'',connectionId:'',started:false});emitStatus();emitLobby()}
   function networkError(type){if(browserOffline())return 'Ingen internetanslutning.';if(type==='peer-unavailable')return 'Rummet hittades inte. Kontrollera rumskoden.';if(type==='unavailable-id')return 'Rumskoden används redan. Försök med en ny.';return 'Onlineanslutningen bröts. Försök igen.'}
   function rememberMove(moveId){if(!moveId)return;seenMoveIds.set(moveId,net.revision);while(seenMoveIds.size>MAX_SEEN_MOVES)seenMoveIds.delete(seenMoveIds.keys().next().value)}
 
@@ -68,13 +69,13 @@ export function createOnlineController(callbacks={}){
 
   function handleGuestMessage(message){
     if(message?.protocol!==ONLINE_PROTOCOL_VERSION)return;
-    if(message.type==='LOBBY'){net.players=Array.isArray(message.players)?clone(message.players):[];net.mode=message.mode==='duel'?'duel':'classic';net.started=!!message.started;emitLobby();return}
+    if(message.type==='LOBBY'){net.players=Array.isArray(message.players)?clone(message.players):[];net.mode=message.mode==='duel'?'duel':'classic';net.countries=cleanCountries(message.countries);net.started=!!message.started;emitLobby();return}
     if(message.type==='STATE'){
       try{
         const previousRevision=net.revision;
         const accepted=acceptStateMessage(previousRevision,message);
         if(!accepted.accepted)return;
-        net.revision=accepted.revision;net.serverRevision=accepted.revision;net.state=accepted.state;net.started=true;
+        net.revision=accepted.revision;net.serverRevision=accepted.revision;net.state=accepted.state;net.countries=cleanCountries(accepted.state?.allowedCountries);net.started=true;
         if(net.pendingMoveId&&(accepted.ackMoveId===net.pendingMoveId||accepted.revision>previousRevision))clearPending();
         cb.onState({state:clone(net.state),role:net.role,playerId:net.playerId,revision:net.revision,ackMoveId:accepted.ackMoveId});emitLobby();
       }catch(error){cb.onError(error)}return;
@@ -134,9 +135,9 @@ export function createOnlineController(callbacks={}){
     if(net.role==='guest'){clearReconnect();connectGuest()}
   }
 
-  async function createRoom({name,code=makeRoomCode(),mode='classic'}={}){
+  async function createRoom({name,code=makeRoomCode(),mode='classic',countries=[]}={}){
     reset();name=cleanName(name);code=cleanRoom(code);if(!name)throw new Error('Skriv ditt namn.');if(!code)throw new Error('Rumskod saknas.');
-    const PeerCtor=await loadPeer();Object.assign(net,{role:'host',status:'connecting',roomCode:code,playerId:HOST_ID,name,mode:mode==='duel'?'duel':'classic',players:[{id:HOST_ID,name,connected:true}]});emitLobby();emitStatus();
+    const PeerCtor=await loadPeer();Object.assign(net,{role:'host',status:'connecting',roomCode:code,playerId:HOST_ID,name,mode:mode==='duel'?'duel':'classic',countries:cleanCountries(countries),players:[{id:HOST_ID,name,connected:true}]});emitLobby();emitStatus();
     const peer=new PeerCtor(roomPeerId(code),peerOptions());net.peer=peer;
     await new Promise((resolve,reject)=>{let opened=false;const timeout=setTimeout(()=>reject(new Error('Nätverkstjänsten svarar inte.')),9000);peer.on('open',()=>{clearTimeout(timeout);peerOpened();if(!opened){opened=true;resolve()}});peer.on('connection',attachGuest);peer.on('error',error=>{if(!peer.open&&!opened){clearTimeout(timeout);reject(new Error(networkError(error?.type)))}else if(!peer.open&&net.role==='host')scheduleReconnect(error?.type||'network');else cb.onError(new Error(networkError(error?.type)))});peer.on('disconnected',()=>{if(!peer.destroyed)scheduleReconnect('peer-disconnected')})});broadcastLobby();return snapshot();
   }
@@ -152,9 +153,10 @@ export function createOnlineController(callbacks={}){
   if(typeof globalThis.addEventListener==='function')globalThis.addEventListener('online',onBrowserOnline);
 
   function setMode(mode){if(net.role!=='host'||net.started)return false;net.mode=mode==='duel'?'duel':'classic';broadcastLobby();return true}
-  function startGame(){if(net.role!=='host')throw new Error('Bara värden kan starta matchen.');if(net.players.length!==MAX_PLAYERS||net.players.some(player=>player.connected===false))throw new Error('Två anslutna spelare krävs.');seenMoveIds.clear();clearPending();const roster=clone(net.players);net.state=createGame({mode:net.mode,players:roster.map(player=>player.name),playerIds:roster.map(player=>player.id)});net.revision=0;net.serverRevision=0;net.started=true;const message=createStateMessage(net.state,net.revision);broadcast(message);broadcastLobby();cb.onState({state:clone(net.state),role:net.role,playerId:net.playerId,revision:net.revision,ackMoveId:null});return clone(net.state)}
+  function setCountries(countries){if(net.role!=='host'||net.started)return false;net.countries=cleanCountries(countries);broadcastLobby();return true}
+  function startGame(){if(net.role!=='host')throw new Error('Bara värden kan starta matchen.');if(net.players.length!==MAX_PLAYERS||net.players.some(player=>player.connected===false))throw new Error('Två anslutna spelare krävs.');seenMoveIds.clear();clearPending();const roster=clone(net.players);net.state=createGame({mode:net.mode,players:roster.map(player=>player.name),playerIds:roster.map(player=>player.id),allowedCountries:net.countries});net.revision=0;net.serverRevision=0;net.started=true;const message=createStateMessage(net.state,net.revision);broadcast(message);broadcastLobby();cb.onState({state:clone(net.state),role:net.role,playerId:net.playerId,revision:net.revision,ackMoveId:null});return clone(net.state)}
   function submitMove(place){if(!net.started||!net.state)throw new Error('Matchen har inte startat.');const current=net.state.players[net.state.turn];if(current?.onlineId!==net.playerId)throw new Error('Det är inte din tur.');if(net.pendingMoveId)throw new Error('Väntar på föregående drag.');const message=createMoveMessage(net.playerId,place);net.pendingMoveId=message.clientMoveId;net.pendingMove=clone(message);emitStatus();if(net.role==='host')return hostApplyMove(message,HOST_ID);if(!net.hostConn?.open){clearPending();throw new Error('Ingen kontakt med värden.')}send(net.hostConn,message);return true}
   function canMove(){return !!(net.started&&net.state?.status==='playing'&&!net.pendingMoveId&&net.state.players[net.state.turn]?.onlineId===net.playerId&&net.status==='connected')}
   function leave(){if(net.role==='host')broadcast({protocol:ONLINE_PROTOCOL_VERSION,type:'ROOM_CLOSED',message:'Värden stängde rummet.'});reset()}
-  return {createRoom,joinRoom,setMode,startGame,submitMove,canMove,leave,snapshot,makeRoomCode};
+  return {createRoom,joinRoom,setMode,setCountries,startGame,submitMove,canMove,leave,snapshot,makeRoomCode};
 }

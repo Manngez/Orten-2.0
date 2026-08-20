@@ -35,12 +35,17 @@
         <button id="homeBack" class="ghost compact" type="button">← Till start</button>
         <p class="eyebrow">EN ENHET</p>
         <h1 class="setup-title">Välj spelläge.</h1>
-        <p class="lead">Sedan är det bara att skriva spelarnas namn och starta.</p>
+        <p class="lead">Välj spelläge, område och spelarnas namn. Sedan startar ni.</p>
         <div class="mode-grid" id="modeGrid">
           <button data-mode="classic" class="mode selected"><b>⚡ Klassisk</b><span>Första korsningen avgör.</span></button>
           <button data-mode="solo" class="mode"><b>🧭 Solo</b><span>Bygg längsta möjliga rutt.</span></button>
           <button data-mode="duel" class="mode"><b>⚔️ Duell</b><span>Var sin rutt. Korsning med någon linje räknas.</span></button>
         </div>
+        <section class="setup-option-block">
+          <span class="eyebrow">OMRÅDE</span>
+          <h2>Vilka länder ska vara med?</h2>
+          <div id="localCountryPicker" class="country-picker"></div>
+        </section>
         <div id="names" class="names"></div>
         <button id="start" class="primary full" disabled>Starta spel</button>
       </div>
@@ -89,9 +94,13 @@
             <button class="mode selected" data-online-mode="classic" type="button"><b>⚡ Klassisk</b><span>En gemensam rutt. Första korsningen förlorar.</span></button>
             <button class="mode" data-online-mode="duel" type="button"><b>⚔️ Duell</b><span>Var sin rutt. Alla tidigare linjer räknas.</span></button>
           </div>
+          <div class="online-country-block">
+            <span class="eyebrow">OMRÅDE</span><h2>Vilka länder ska vara med?</h2>
+            <div id="onlineCountryPicker" class="country-picker"></div>
+          </div>
           <button id="startOnline" class="primary full" type="button" disabled>Väntar på spelare…</button>
         </section>
-        <section id="guestWaiting" class="lobby-card hidden"><span class="eyebrow">REDO</span><h2>Väntar på värden</h2><p class="lead small">När värden startar matchen öppnas kartan automatiskt på båda enheterna.</p></section>
+        <section id="guestWaiting" class="lobby-card hidden"><span class="eyebrow">REDO</span><h2>Väntar på värden</h2><p class="lead small">När värden startar matchen öppnas kartan automatiskt på båda enheterna.</p><p id="guestCountrySummary" class="country-guest-summary">Område: Sverige</p></section>
         <p id="lobbyMessage" class="data-status"></p>
       </div>
     </section>

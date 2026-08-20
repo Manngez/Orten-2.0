@@ -2,7 +2,12 @@ name: Testa Orten 3.0
 
 on:
   push:
-    branches: [v3-online-flow]
+    branches: ['v3-*']
+  pull_request:
+    paths:
+      - 'v3/**'
+      - 'scripts/**'
+      - '.github/workflows/v3-ci.yml'
   workflow_dispatch:
 
 permissions:

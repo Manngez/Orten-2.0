@@ -11,8 +11,21 @@ let activeManifest=null;
 let buckets1=new Map();
 let buckets2=new Map();
 let byId=new Map();
+let countryCounts=new Map();
+let regionNames=null;
 
 const norm=value=>String(value||'').trim().toLowerCase().normalize('NFKD').replace(/\p{M}/gu,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+const cleanCountryCode=value=>String(value||'').trim().toUpperCase();
+
+function countryName(code){
+  code=cleanCountryCode(code);
+  if(!code)return '';
+  try{
+    regionNames=regionNames||new Intl.DisplayNames(['sv'],{type:'region'});
+    const name=regionNames.of(code);
+    return name&&name!==code?name:code;
+  }catch{return code}
+}
 
 function hex(buffer){return [...new Uint8Array(buffer)].map(byte=>byte.toString(16).padStart(2,'0')).join('');}
 
@@ -43,9 +56,11 @@ function addBucket(map,key,place){
 }
 
 function rebuildSearchIndex(){
-  buckets1=new Map();buckets2=new Map();byId=new Map();
+  buckets1=new Map();buckets2=new Map();byId=new Map();countryCounts=new Map();
   for(const place of places){
     byId.set(String(place.id),place);
+    const cc=cleanCountryCode(place.countryCode);
+    if(cc)countryCounts.set(cc,(countryCounts.get(cc)||0)+1);
     place.searchName=place.searchName||norm(place.name);
     const terms=[place.searchName,...(place.aliases||[])].map(norm).filter(Boolean);
     const one=new Set();const two=new Set();
@@ -81,7 +96,7 @@ export async function loadPlaces({allowDemo=false}={}){
     const id=Number(row[0]);const name=String(row[1]||'').trim();const lat=Number(row[2]);const lon=Number(row[3]);const countryCode=String(row[4]||'').toUpperCase();
     if(!Number.isInteger(id)||!name||!Number.isFinite(lat)||!Number.isFinite(lon)||lat< -90||lat>90||lon< -180||lon>180||!/^[A-Z]{2}$/.test(countryCode))throw new Error(`Ortregistret innehåller ogiltig data vid ${name||id||'okänd ort'}.`);
     countries.add(countryCode);
-    mapped.push({id:String(id),name,lat,lon,countryCode,country:countryCode,region:String(row[6]||''),population:Number(row[7])||0,featureCode:String(row[8]||''),searchName:String(row[9]||norm(name)),aliases:String(row[10]||'').split('\u0001').filter(Boolean)});
+    mapped.push({id:String(id),name,lat,lon,countryCode,country:countryName(countryCode),region:String(row[6]||''),population:Number(row[7])||0,featureCode:String(row[8]||''),searchName:String(row[9]||norm(name)),aliases:String(row[10]||'').split('\u0001').filter(Boolean)});
   }
 
   assertDatasetManifest(manifest,{count:mapped.length,countryCount:countries.size,bytes:integrity.bytes,sha256:integrity.sha256});
@@ -97,13 +112,24 @@ function scorePlace(place,q){
   return score;
 }
 
-export function searchPlaces(query,limit=12){
+function countryFilter(options){
+  const raw=options instanceof Set||Array.isArray(options)?options:options?.countries;
+  if(!raw)return null;
+  const values=[...raw].map(cleanCountryCode).filter(code=>/^[A-Z]{2}$/.test(code));
+  return values.length?new Set(values):null;
+}
+
+export function searchPlaces(query,limit=12,options=null){
   const q=norm(query);if(!q)return [];
+  const allowed=countryFilter(options);
   const bucket=q.length>1?(buckets2.get(q.slice(0,2))||[]):(buckets1.get(q[0])||[]);const seen=new Set();const hits=[];
-  for(const place of bucket){if(seen.has(place.id))continue;seen.add(place.id);const score=scorePlace(place,q);if(score)hits.push({place,score})}
+  for(const place of bucket){if(seen.has(place.id))continue;seen.add(place.id);if(allowed&&!allowed.has(place.countryCode))continue;const score=scorePlace(place,q);if(score)hits.push({place,score})}
   return hits.sort((a,b)=>b.score-a.score||b.place.population-a.place.population||a.place.name.localeCompare(b.place.name,'sv')).slice(0,limit).map(item=>item.place);
 }
 
+export function countryOptions(){
+  return [...countryCounts.entries()].map(([code,count])=>({code,name:countryName(code),count})).sort((a,b)=>a.name.localeCompare(b.name,'sv'));
+}
 export function placeById(id){return byId.get(String(id))||null}
 export function dataSource(){return source}
 export function dataManifest(){return activeManifest}
