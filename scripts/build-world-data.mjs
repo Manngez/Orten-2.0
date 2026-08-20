@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -5,6 +6,8 @@ import { join } from 'node:path';
 
 const ROOT = new URL('../', import.meta.url);
 const OUT = new URL('data/world-places.json', ROOT);
+const META = new URL('data/world-meta.json', ROOT);
+const MANIFEST = new URL('data/world-manifest.json', ROOT);
 const PRIMARY = 'https://download.geonames.org/export/dump';
 const CITIES_URL = `${PRIMARY}/cities500.zip`;
 const ADMIN1_URL = `${PRIMARY}/admin1CodesASCII.txt`;
@@ -12,6 +15,7 @@ const MIRROR_CITIES_URL = 'https://raw.githubusercontent.com/malikdunston/cities
 const ACCEPTED = new Set(['PPL','PPLA','PPLA2','PPLA3','PPLA4','PPLA5','PPLC','PPLG','PPLL','PPLR','PPLS','PPLX']);
 const MIN_PLACES = 150_000;
 const MIN_COUNTRIES = 200;
+const SCHEMA_VERSION = 1;
 
 const clean = value => String(value ?? '').normalize('NFKC').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
 const norm = value => clean(value).toLowerCase().normalize('NFKD').replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -23,7 +27,7 @@ async function fetchWithRetry(url, { timeout = 180_000, attempts = 4 } = {}) {
     try {
       const response = await fetch(url, {
         signal: AbortSignal.timeout(timeout),
-        headers: { 'User-Agent': 'Orten-2.0-build/2.1' }
+        headers: { 'User-Agent': 'Orten-3.0-build/3.0' }
       });
       if (!response.ok) throw new Error(`${url} svarade ${response.status}`);
       return response;
@@ -92,7 +96,7 @@ async function loadCitiesSource(work) {
   }
 }
 
-const work = mkdtempSync(join(tmpdir(), 'orten2-world-'));
+const work = mkdtempSync(join(tmpdir(), 'orten3-world-'));
 try {
   const [{ text: source, source: sourceLabel }, adminText] = await Promise.all([
     loadCitiesSource(work),
@@ -134,14 +138,31 @@ try {
 
   rows.sort((a,b) => a[9].localeCompare(b[9]) || b[7] - a[7] || a[0] - b[0]);
   mkdirSync(new URL('data/', ROOT), { recursive: true });
-  writeFileSync(OUT, JSON.stringify(rows), 'utf8');
-  writeFileSync(new URL('data/world-meta.json', ROOT), JSON.stringify({
-    generatedAt: new Date().toISOString(),
+
+  const generatedAt = new Date().toISOString();
+  const json = JSON.stringify(rows);
+  const bytes = Buffer.byteLength(json, 'utf8');
+  const sha256 = createHash('sha256').update(json, 'utf8').digest('hex');
+  const version = `${generatedAt.slice(0,10)}-${sha256.slice(0,12)}`;
+  const manifest = {
+    schemaVersion: SCHEMA_VERSION,
+    dataset: 'geonames-cities500',
+    version,
+    generatedAt,
     source: sourceLabel,
     count: rows.length,
+    countryCount: countries.size,
+    bytes,
+    sha256
+  };
+
+  writeFileSync(OUT, json, 'utf8');
+  writeFileSync(MANIFEST, JSON.stringify(manifest), 'utf8');
+  writeFileSync(META, JSON.stringify({
+    ...manifest,
     countries: Object.fromEntries([...countries.entries()].sort())
   }), 'utf8');
-  console.log(`Klart: ${rows.length.toLocaleString('en-US')} spelbara orter i ${countries.size} land/territorier från ${sourceLabel}.`);
+  console.log(`Klart: ${rows.length.toLocaleString('en-US')} spelbara orter i ${countries.size} land/territorier från ${sourceLabel}. Dataset ${version}.`);
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

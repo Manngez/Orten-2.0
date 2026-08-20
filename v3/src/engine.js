@@ -1,13 +1,33 @@
-import {intersection,project} from './geometry.js';
+import {intersectionOf,unwrapLon} from './geometry.js';
 
 const clone=value=>structuredClone(value);
+const MODES=new Set(['classic','solo','duel']);
+const finiteCoord=value=>Number.isFinite(Number(value));
+const validLatLon=point=>!!point&&finiteCoord(point.lat)&&finiteCoord(point.lon)&&Number(point.lat)>=-90&&Number(point.lat)<=90&&Number(point.lon)>=-180&&Number(point.lon)<=180;
 
-export function createGame({mode='classic',players=[]}={}){
-  const cleanPlayers=players.map((name,index)=>({id:index,name:String(name||`Spelare ${index+1}`).trim()||`Spelare ${index+1}`,moves:0}));
+export function createGame({mode='classic',players=[],playerIds=[]}={}){
+  if(!MODES.has(mode))throw new Error('Okänt spelläge.');
+  const cleanPlayers=players.map((name,index)=>({
+    id:index,
+    onlineId:playerIds[index]?String(playerIds[index]):null,
+    name:String(name||`Spelare ${index+1}`).trim()||`Spelare ${index+1}`,
+    moves:0
+  }));
   if(mode==='solo'&&cleanPlayers.length!==1)throw new Error('Solo kräver exakt en spelare.');
   if(mode==='duel'&&cleanPlayers.length!==2)throw new Error('Duell kräver exakt två spelare.');
   if(!cleanPlayers.length)throw new Error('Minst en spelare krävs.');
-  return {version:1,mode,status:'playing',turn:0,players:cleanPlayers,places:[],segments:[],crossing:null,winner:null};
+  return {version:2,mode,status:'playing',turn:0,players:cleanPlayers,places:[],segments:[],crossing:null,winner:null};
+}
+
+export function isGameState(value){
+  if(!value||value.version!==2||!MODES.has(value.mode)||!['playing','finished'].includes(value.status))return false;
+  if(!Array.isArray(value.players)||!value.players.length||!Array.isArray(value.places)||!Array.isArray(value.segments))return false;
+  if(!Number.isInteger(value.turn)||value.turn<0||value.turn>=value.players.length)return false;
+  if(value.players.some((p,index)=>!p||p.id!==index||typeof p.name!=='string'||!Number.isInteger(p.moves)||p.moves<0))return false;
+  if(value.places.some(p=>!p||typeof p.id!=='string'||typeof p.name!=='string'||!validLatLon(p)||!Number.isInteger(p.playerIndex)||p.playerIndex<0||p.playerIndex>=value.players.length))return false;
+  if(value.segments.some(segment=>!segment||!validLatLon(segment.a)||!validLatLon(segment.b)||!Number.isInteger(segment.playerIndex)||segment.playerIndex<0||segment.playerIndex>=value.players.length))return false;
+  if(value.crossing&&( !finiteCoord(value.crossing.lat)||!finiteCoord(value.crossing.lon)||Number(value.crossing.lat)<-90||Number(value.crossing.lat)>90||Number(value.crossing.lon)<-180||Number(value.crossing.lon)>180))return false;
+  return true;
 }
 
 function playerLastPlace(state,playerIndex){
@@ -20,20 +40,42 @@ function startForMove(state){
   return state.places.at(-1)||null;
 }
 
+function preparePlace(state,rawPlace){
+  const start=startForMove(state);
+  const lon=Number(rawPlace.lon);
+  const startUx=start?(Number.isFinite(Number(start.ux))?Number(start.ux):Number(start.lon)):null;
+  return {
+    id:String(rawPlace.id??rawPlace.geonameId??`${rawPlace.name}-${rawPlace.lat}-${rawPlace.lon}`),
+    name:String(rawPlace.name),
+    country:String(rawPlace.country||''),
+    countryCode:String(rawPlace.countryCode||''),
+    region:String(rawPlace.region||''),
+    lat:Number(rawPlace.lat),
+    lon,
+    ux:start?unwrapLon(lon,startUx):lon,
+    playerIndex:state.turn
+  };
+}
+
 function candidateSegment(state,place){
   const start=startForMove(state);
   if(!start)return null;
-  return {a:start,b:place,playerIndex:state.turn};
+  const startUx=Number.isFinite(Number(start.ux))?Number(start.ux):Number(start.lon);
+  return {a:{...start,ux:startUx},b:{...place,ux:unwrapLon(place.lon,startUx)},playerIndex:state.turn};
 }
 
-export function crossingsForMove(state,place){
+export function crossingsForMove(state,rawPlace){
+  const place=Number.isFinite(Number(rawPlace?.ux))?rawPlace:preparePlace(state,rawPlace);
   const segment=candidateSegment(state,place);
   if(!segment)return [];
-  const a=project(segment.a.lat,segment.a.lon),b=project(segment.b.lat,segment.b.lon);
   const hits=[];
+  const referenceUx=segment.a.ux;
+
   for(let i=0;i<state.segments.length;i++){
     const old=state.segments[i];
-    const hit=intersection(a,b,project(old.a.lat,old.a.lon),project(old.b.lat,old.b.lon));
+    const a={...old.a,ux:unwrapLon(old.a.lon,referenceUx)};
+    const b={...old.b,ux:unwrapLon(old.b.lon,a.ux)};
+    const hit=intersectionOf(segment.a,segment.b,a,b);
     if(hit)hits.push({...hit,segmentIndex:i,crossedPlayerIndex:old.playerIndex});
   }
   return hits.sort((x,y)=>x.t-y.t);
@@ -45,10 +87,11 @@ function nextTurn(state){
 }
 
 export function playPlace(inputState,rawPlace){
+  if(!isGameState(inputState))throw new Error('Ogiltigt spelstate.');
   if(inputState.status!=='playing')throw new Error('Spelet är avslutat.');
   const state=clone(inputState);
-  const place={id:String(rawPlace.id??rawPlace.geonameId??`${rawPlace.name}-${rawPlace.lat}-${rawPlace.lon}`),name:String(rawPlace.name),country:String(rawPlace.country||''),countryCode:String(rawPlace.countryCode||''),lat:Number(rawPlace.lat),lon:Number(rawPlace.lon),playerIndex:state.turn};
-  if(!place.name||!Number.isFinite(place.lat)||!Number.isFinite(place.lon))throw new Error('Ogiltig ort.');
+  const place=preparePlace(state,rawPlace);
+  if(!place.name||!Number.isFinite(place.lat)||!Number.isFinite(place.lon)||place.lat< -90||place.lat>90||place.lon< -180||place.lon>180)throw new Error('Ogiltig ort.');
   if(state.places.some(p=>p.id===place.id&&p.playerIndex===state.turn))throw new Error('Du har redan spelat den orten.');
 
   const segment=candidateSegment(state,place);

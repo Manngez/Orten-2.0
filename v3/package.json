@@ -1,1 +1,1 @@
-{"private":true,"type":"module","scripts":{"test":"node --test tests/*.test.js"}}
+{"private":true,"type":"module","scripts":{"test":"node --check src/main.js && node --check src/online.js && node --check src/debug.js && node --check src/journal.js && node --check src/map.js && node --test tests/*.test.js"}}

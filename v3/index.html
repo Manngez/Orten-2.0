@@ -4,45 +4,138 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#06111d">
+  <meta name="description" content="Orten 3.0 – bygg geografiska rutter och undvik linjekorsningar.">
   <title>Orten 3.0</title>
+  <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="./app.css">
 </head>
 <body>
   <main id="app">
-    <section id="home" class="screen active">
-      <div class="shell hero">
-        <p class="eyebrow">ORTEN 3.0 · NY MOTOR</p>
+    <section id="entry" class="screen active">
+      <div class="shell hero entry-hero">
+        <p class="eyebrow">ORTEN 3.0</p>
         <h1>Bygg en rutt.<br>Undvik korsningen.</h1>
-        <p class="lead">En ren ombyggnad av Orten. Lokal och online ska använda samma regler och samma spelstate.</p>
+        <p class="lead">Välj bara hur ni vill spela. Reglerna ställer ni in i nästa steg.</p>
+        <div class="entry-grid">
+          <button id="localEntry" class="entry-card" type="button">
+            <span class="entry-icon">📱</span><b>En enhet</b><small>Spela tillsammans på samma mobil, surfplatta eller dator.</small><em>Fortsätt →</em>
+          </button>
+          <button id="onlineEntry" class="entry-card featured" type="button">
+            <span class="entry-icon">🌐</span><b>Online</b><small>Skapa ett rum eller anslut med en enkel rumskod.</small><em>Fortsätt →</em>
+          </button>
+        </div>
+        <p id="dataStatus" class="data-status">Verifierar ortregistret…</p>
+        <button id="historyEntry" class="history-link hidden" type="button">↺ Senaste matcher</button>
+      </div>
+    </section>
+
+    <section id="home" class="screen">
+      <div class="shell hero setup-shell">
+        <button id="homeBack" class="ghost compact" type="button">← Till start</button>
+        <p class="eyebrow">EN ENHET</p>
+        <h1 class="setup-title">Välj spelläge.</h1>
+        <p class="lead">Sedan är det bara att skriva spelarnas namn och starta.</p>
         <div class="mode-grid" id="modeGrid">
           <button data-mode="classic" class="mode selected"><b>⚡ Klassisk</b><span>Första korsningen avgör.</span></button>
           <button data-mode="solo" class="mode"><b>🧭 Solo</b><span>Bygg längsta möjliga rutt.</span></button>
-          <button data-mode="duel" class="mode"><b>⚔️ Duell</b><span>Två separata linjer. Korsning med egen eller motståndarens linje räknas.</span></button>
+          <button data-mode="duel" class="mode"><b>⚔️ Duell</b><span>Var sin rutt. Korsning med någon linje räknas.</span></button>
         </div>
-        <label class="field"><span>Spelare</span><select id="playerCount"><option value="1">1 spelare</option><option value="2" selected>2 spelare</option></select></label>
         <div id="names" class="names"></div>
-        <button id="start" class="primary">Starta spel</button>
-        <p id="dataStatus" class="data-status">Kontrollerar ortregistret…</p>
+        <button id="start" class="primary full" disabled>Starta spel</button>
+      </div>
+    </section>
+
+    <section id="online" class="screen">
+      <div class="shell hero online-shell">
+        <button id="onlineBack" class="ghost compact" type="button">← Till start</button>
+        <p class="eyebrow">ONLINE</p>
+        <h1 class="setup-title">Spela på varsin enhet.</h1>
+        <p class="lead">En spelare skapar rummet. Den andra skriver in rumskoden.</p>
+        <div id="onlineChoice" class="entry-grid online-choice">
+          <button id="showCreate" class="entry-card featured" type="button"><span class="entry-icon">＋</span><b>Skapa rum</b><small>Du blir värd och väljer spelregler.</small><em>Skapa →</em></button>
+          <button id="showJoin" class="entry-card" type="button"><span class="entry-icon">↗</span><b>Anslut till rum</b><small>Skriv ditt namn och rumskoden.</small><em>Anslut →</em></button>
+        </div>
+
+        <div id="createForm" class="online-form hidden">
+          <button class="text-back" type="button" data-online-choice>← Byt val</button>
+          <label class="field"><span>Ditt namn</span><input id="hostName" maxlength="24" autocomplete="name" value="Spelare 1"></label>
+          <label class="field"><span>Rumskod</span><div class="code-row"><input id="createCode" maxlength="6" autocomplete="off"><button id="newCode" class="ghost" type="button">Ny kod</button></div></label>
+          <button id="createRoom" class="primary full" type="button">Skapa rum</button>
+        </div>
+
+        <div id="joinForm" class="online-form hidden">
+          <button class="text-back" type="button" data-online-choice>← Byt val</button>
+          <label class="field"><span>Ditt namn</span><input id="guestName" maxlength="24" autocomplete="name" value="Spelare 2"></label>
+          <label class="field"><span>Rumskod</span><input id="joinCode" maxlength="6" autocomplete="off" autocapitalize="characters" inputmode="text" placeholder="ABCDE"></label>
+          <button id="joinRoom" class="primary full" type="button">Anslut</button>
+        </div>
+        <p id="onlineStatus" class="data-status"></p>
+      </div>
+    </section>
+
+    <section id="lobby" class="screen">
+      <div class="shell lobby-shell">
+        <div class="lobby-top"><button id="leaveLobby" class="ghost compact" type="button">← Lämna</button><span id="lobbyConnection" class="connection-badge">Ansluter…</span></div>
+        <p class="eyebrow">SPELRUM</p>
+        <div class="room-code-card"><div><span>Rumskod</span><strong id="roomCode">-----</strong></div><button id="copyCode" class="ghost" type="button">Kopiera</button></div>
+        <section class="lobby-card">
+          <div class="section-head"><div><span class="eyebrow">SPELARE</span><h2>Rummet</h2></div><b id="lobbyCount">1 / 2</b></div>
+          <div id="lobbyPlayers" class="lobby-players"></div>
+        </section>
+        <section id="hostSettings" class="lobby-card hidden">
+          <span class="eyebrow">SPELREGLER</span><h2>Välj spelläge</h2>
+          <div id="onlineModeGrid" class="online-mode-grid">
+            <button class="mode selected" data-online-mode="classic" type="button"><b>⚡ Klassisk</b><span>En gemensam rutt. Första korsningen förlorar.</span></button>
+            <button class="mode" data-online-mode="duel" type="button"><b>⚔️ Duell</b><span>Var sin rutt. Alla tidigare linjer räknas.</span></button>
+          </div>
+          <button id="startOnline" class="primary full" type="button" disabled>Väntar på spelare…</button>
+        </section>
+        <section id="guestWaiting" class="lobby-card hidden"><span class="eyebrow">REDO</span><h2>Väntar på värden</h2><p class="lead small">När värden startar matchen öppnas kartan automatiskt på båda enheterna.</p></section>
+        <p id="lobbyMessage" class="data-status"></p>
+      </div>
+    </section>
+
+    <section id="history" class="screen">
+      <div class="shell history-shell">
+        <button id="historyBack" class="ghost compact" type="button">← Till start</button>
+        <p class="eyebrow">MATCHHISTORIK</p>
+        <h1 class="history-title">Senaste matcher</h1>
+        <p class="lead small">Färdiga och avbrutna matcher sparas på den här enheten. Online sparas den auktoritativa journalen hos värden.</p>
+        <div id="historyList" class="history-list"></div>
       </div>
     </section>
 
     <section id="game" class="screen">
-      <header class="game-head"><button id="back" class="ghost">← Avsluta</button><strong>ORTEN 3.0</strong><span id="modeBadge">Klassisk</span></header>
+      <header class="game-head">
+        <button id="back" class="ghost">← Avsluta</button>
+        <strong>ORTEN 3.0</strong>
+        <div class="game-badges"><span id="networkBadge" class="network-badge hidden">Online</span><span id="modeBadge">Klassisk</span></div>
+      </header>
       <div class="game-layout">
         <aside class="panel">
           <span class="eyebrow">TUR</span><h2 id="turnName">Spelare 1</h2>
           <div id="score" class="score"></div>
-          <form id="placeForm" class="search"><input id="placeInput" autocomplete="off" placeholder="Sök ort…"><button class="primary" type="submit">Spela</button></form>
+          <form id="placeForm" class="search"><input id="placeInput" autocomplete="off" inputmode="search" placeholder="Sök ort…"><button id="playButton" class="primary" type="submit">Spela</button></form>
           <div id="results" class="results"></div>
           <p id="message" class="message"></p>
+          <div id="replayControls" class="replay-controls hidden">
+            <div><button id="replayPrev" class="ghost" type="button">←</button><strong id="replayStep">1 / 1</strong><button id="replayNext" class="ghost" type="button">→</button></div>
+            <button id="replayExit" class="ghost" type="button">Stäng repris</button>
+          </div>
         </aside>
         <section class="board">
-          <svg id="board" viewBox="0 0 1000 620" preserveAspectRatio="xMidYMid meet" aria-label="Spelkarta"></svg>
-          <div id="route" class="route"></div>
+          <div class="map-wrap">
+            <div id="map" class="map" aria-label="Spelkarta"></div>
+            <div class="map-tools"><button id="fitMap" class="map-button" type="button">Visa rutten</button></div>
+            <div class="map-hint">Dra och zooma fritt · kartan följer nästa ort automatiskt</div>
+          </div>
+          <div id="route" class="route" aria-label="Spelade orter"></div>
         </section>
       </div>
     </section>
   </main>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
