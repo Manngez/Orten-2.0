@@ -22,6 +22,13 @@ test('värden accepterar bara drag från spelaren vars tur det är',()=>{
   assert.equal(state.turn,0);
 });
 
+test('onlinedrag måste ha ett unikt drag-id',()=>{
+  const state=createGame({mode:'classic',players:['Värd','Gäst'],playerIds:['host','guest']});
+  const message=createMoveMessage('host',place('1','Umeå',63.8258,20.263),'m1');
+  delete message.clientMoveId;
+  assert.throws(()=>applyMoveMessage(state,message),/Drag-id saknas/);
+});
+
 test('gästen ignorerar äldre state-revisioner',()=>{
   const state=createGame({mode:'duel',players:['A','B'],playerIds:['host','guest']});
   const message=createStateMessage(state,4);
