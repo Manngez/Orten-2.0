@@ -1,80 +1,76 @@
-/* Orten 3.0 game shell — intentionally follows the clearer 2.0 in-match layout. */
-#game.game-screen-v2{position:fixed;inset:0;min-height:0;background:#06101d;z-index:20;overflow:hidden}
-#game .game-head.game-topbar-v2{height:66px;padding:8px 14px;display:grid;grid-template-columns:44px 180px minmax(0,1fr);gap:10px;align-items:center;border-bottom:1px solid var(--line);background:rgba(6,15,28,.96);position:relative;top:auto;z-index:800}
-#game .game-topbar-v2 .game-exit-v2{width:44px;height:44px;padding:0;border-radius:12px;font-size:19px;display:grid;place-items:center}
-#game .game-brand-v2{font-size:17px;font-weight:950;letter-spacing:.08em;white-space:nowrap}
-#game .game-brand-v2 span{color:var(--cyan)}
-#game .game-topbar-v2 .game-badges{min-width:0;justify-content:flex-end}
-#game .game-layout.game-layout-v2{position:relative;height:calc(100dvh - 66px);min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr) 330px}
-#game .game-sidebar-v2{position:relative;z-index:600;background:rgba(8,21,35,.97);padding:14px;overflow:auto}
-#game .game-status-panel-v2{border-right:1px solid var(--line)}
-#game .game-input-panel-v2{border-left:1px solid var(--line);display:flex;flex-direction:column;gap:10px}
-#game .turn-card-v2,#game .input-card-v2,#game .route-panel-v2{border:1px solid var(--line);border-radius:17px;background:linear-gradient(145deg,rgba(18,38,56,.92),rgba(9,22,35,.9));padding:14px}
-#game .turn-card-v2 h2{margin:7px 0 4px;font-size:23px;line-height:1.1}
-#game .turn-card-v2 .turn-help-v2{display:block;color:var(--muted);font-size:11px;margin-bottom:12px}
-#game .score-v2{display:grid;gap:6px;margin:0}
-#game .score-v2 .player-score{display:flex;justify-content:space-between;align-items:center;padding:9px 10px;border:1px solid var(--line);border-radius:12px;background:rgba(6,17,29,.6);font-size:12px;color:var(--muted)}
-#game .score-v2 .player-score.active{color:var(--text);border-color:rgba(104,246,255,.45);background:rgba(104,246,255,.05)}
-#game .route-panel-v2{padding:0;overflow:hidden;margin-top:10px}
-#game .route-head-v2{display:flex;align-items:center;justify-content:space-between;padding:12px 13px;border-bottom:1px solid var(--line);font-size:12px}
-#game .route-head-v2 small{color:var(--muted);font-size:10px}
-#game #route.route-v2{display:grid;gap:4px;max-height:calc(100dvh - 295px);overflow:auto;padding:6px;margin:0;border:0;background:transparent}
-#game .route-v2 .route-place{width:100%;white-space:normal;border:0;background:transparent;border-radius:9px;padding:8px 9px;text-align:left;color:#d6e3eb;font:inherit;font-size:11px;cursor:pointer}
-#game .route-v2 .route-place:hover,#game .route-v2 .route-place:focus-visible{background:rgba(104,246,255,.07);outline:none}
-#game .route-v2 .route-place.p0{color:var(--cyan)}
-#game .route-v2 .route-place.p1{color:var(--coral)}
-#game .route-v2 .route-place.p2{color:var(--gold)}
-#game .route-v2 .route-place.p3{color:var(--green)}
-#game .board.board-v2{position:relative;min-width:0;display:block;min-height:0;background:#08101b}
-#game .board-v2 .map-wrap{position:absolute;inset:0;min-height:0;overflow:hidden}
-#game .board-v2 .map{position:absolute;inset:0}
-#game .board-v2 .map-tools{right:14px;top:14px}
-#game .board-v2 .map-hint{bottom:15px}
-#game .input-card-v2 h2{font-size:24px;margin:5px 0}
-#game .input-card-v2>p{font-size:12px;color:var(--muted);line-height:1.45;margin:0 0 13px}
-#game .search-v2{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
-#game .search-v2 input{min-width:0;min-height:48px}
-#game .search-v2 .primary{min-width:72px}
-#game .results-v2{display:grid;gap:6px;margin-top:8px;max-height:42dvh;overflow:auto}
-#game .message-v2{min-height:42px;margin:10px 0 0;padding:10px 11px;border:1px solid transparent;border-radius:11px;color:var(--muted);font-size:12px;line-height:1.45}
-#game .message-v2.cross{color:#ffc0b4;border-color:rgba(255,143,112,.28);background:rgba(255,143,112,.06)}
-#game .replay-controls-v2{margin-top:auto;border:1px solid var(--line);border-radius:14px;background:rgba(8,24,36,.76);padding:10px}
-#game .mobile-status-check,#game .mobile-status-toggle{display:none}
+/* Orten 3.0: behåll motorn och DOM-kontraktet, men återskapa 2.0:s tydligare spelvy. */
+#game.active{position:fixed;inset:0;min-height:0;overflow:hidden;background:#06101d;z-index:20}
+#game .game-head{height:66px;padding:8px 14px;display:grid;grid-template-columns:auto 180px minmax(0,1fr);gap:10px;align-items:center;border-bottom:1px solid var(--line);background:rgba(6,15,28,.96);position:relative;top:auto;z-index:800}
+#game .game-head>#back{width:44px;height:44px;padding:0;border-radius:12px;font-size:0;display:grid;place-items:center}
+#game .game-head>#back::before{content:"←";font-size:20px}
+#game .game-head>strong{text-align:left;font-size:16px;letter-spacing:.08em;white-space:nowrap}
+#game .game-badges{min-width:0;justify-content:flex-end}
+
+/* Desktop: status/rutt vänster, karta i mitten, nästa ort höger. */
+#game .game-layout{height:calc(100dvh - 66px);min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr) 330px;grid-template-rows:auto auto auto minmax(0,1fr) auto;background:#08101b}
+#game .game-layout>.panel,#game .game-layout>.board{display:contents}
+#game .panel>.eyebrow{grid-column:1;grid-row:1;margin:14px 14px 0;padding:14px 14px 2px;border:1px solid var(--line);border-bottom:0;border-radius:17px 17px 0 0;background:linear-gradient(145deg,rgba(18,38,56,.92),rgba(9,22,35,.9));z-index:5}
+#game .panel>h2{grid-column:1;grid-row:2;margin:0 14px;padding:4px 14px 12px;border-inline:1px solid var(--line);background:linear-gradient(145deg,rgba(18,38,56,.92),rgba(9,22,35,.9));font-size:23px;line-height:1.1;z-index:5}
+#game #score{grid-column:1;grid-row:3;margin:0 14px;padding:0 14px 14px;border:1px solid var(--line);border-top:0;border-radius:0 0 17px 17px;background:linear-gradient(145deg,rgba(18,38,56,.92),rgba(9,22,35,.9));z-index:5}
+#game #score .player-score{background:rgba(6,17,29,.6);font-size:12px}
+#game #route{grid-column:1;grid-row:4/6;align-self:stretch;display:grid;align-content:start;gap:4px;min-height:0;max-height:none;margin:10px 14px 14px;padding:42px 6px 6px;border:1px solid var(--line);border-radius:17px;background:linear-gradient(145deg,rgba(18,38,56,.92),rgba(9,22,35,.9));overflow:auto;position:relative;z-index:5}
+#game #route::before{content:"VALDA ORTER";position:absolute;left:13px;top:12px;color:var(--text);font-size:11px;font-weight:900;letter-spacing:.04em}
+#game #route .route-place{width:100%;white-space:normal;border:0;background:transparent;border-radius:9px;padding:8px 9px;text-align:left;color:#d6e3eb;font:inherit;font-size:11px;cursor:pointer}
+#game #route .route-place:hover,#game #route .route-place:focus-visible{background:rgba(104,246,255,.07);outline:none}
+#game #route .route-place.p0{color:var(--cyan)}
+#game #route .route-place.p1{color:var(--coral)}
+#game #route .route-place.p2{color:var(--gold)}
+#game #route .route-place.p3{color:var(--green)}
+
+#game .map-wrap{grid-column:2;grid-row:1/6;position:relative;min-height:0;height:auto;overflow:hidden;border-inline:1px solid var(--line);z-index:1}
+#game .map-wrap .map{position:absolute;inset:0}
+#game .map-tools{right:14px;top:14px}
+#game .map-hint{bottom:15px}
+
+#game #placeForm{grid-column:3;grid-row:1;margin:14px 14px 0;padding:42px 14px 10px;border:1px solid var(--line);border-bottom:0;border-radius:17px 17px 0 0;background:linear-gradient(145deg,rgba(18,38,56,.92),rgba(9,22,35,.9));position:relative;z-index:5}
+#game #placeForm::before{content:"NÄSTA PLATS";position:absolute;left:14px;top:14px;color:var(--cyan);font-size:10px;font-weight:950;letter-spacing:.13em}
+#game #placeForm.search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
+#game #placeForm input{min-width:0;min-height:48px}
+#game #placeForm .primary{min-width:72px}
+#game #results{grid-column:3;grid-row:2/5;align-self:stretch;min-height:0;max-height:none;margin:0 14px;padding:0 14px 8px;border-inline:1px solid var(--line);background:linear-gradient(145deg,rgba(18,38,56,.92),rgba(9,22,35,.9));overflow:auto;z-index:5}
+#game #message{grid-column:3;grid-row:5;min-height:56px;margin:0 14px 14px;padding:10px 14px 14px;border:1px solid var(--line);border-top:0;border-radius:0 0 17px 17px;background:linear-gradient(145deg,rgba(18,38,56,.92),rgba(9,22,35,.9));color:var(--muted);font-size:12px;line-height:1.45;z-index:5}
+#game #message.cross{color:#ffc0b4}
+#game #replayControls{grid-column:3;grid-row:2/6;align-self:start;margin:12px 14px;z-index:8}
 
 @media(max-width:1050px) and (min-width:781px){
-  #game .game-layout.game-layout-v2{grid-template-columns:220px minmax(0,1fr) 280px}
-  #game .game-head.game-topbar-v2{grid-template-columns:44px 150px minmax(0,1fr)}
+  #game .game-layout{grid-template-columns:220px minmax(0,1fr) 280px}
+  #game .game-head{grid-template-columns:auto 150px minmax(0,1fr)}
 }
 
+/* Mobil: kartan dominerar, sökrutan ligger som i 2.0 längst ned. */
 @media(max-width:780px){
-  #game .game-head.game-topbar-v2{height:58px;padding:6px 8px;grid-template-columns:40px 118px minmax(0,1fr);gap:7px}
-  #game .game-topbar-v2 .game-exit-v2{width:40px;height:40px;font-size:18px}
-  #game .game-brand-v2{font-size:13px;letter-spacing:.04em}
+  #game .game-head{height:58px;padding:6px 8px;grid-template-columns:40px 118px minmax(0,1fr);gap:7px}
+  #game .game-head>#back{width:40px;height:40px}
+  #game .game-head>strong{text-align:left;margin:0;font-size:12px;letter-spacing:.03em}
   #game .game-badges{gap:5px}
   #game .game-badges #modeBadge{font-size:9px}
   #game .network-badge{max-width:112px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:8px;padding:5px 7px}
-  #game .game-layout.game-layout-v2{height:calc(100dvh - 58px);display:block;min-height:0;overflow:hidden}
-  #game .board.board-v2{position:absolute;inset:0 0 104px 0;min-height:0}
-  #game .board-v2 .map-wrap{inset:0}
-  #game .game-input-panel-v2{position:absolute;left:7px;right:7px;bottom:calc(7px + env(safe-area-inset-bottom));z-index:620;max-height:min(46dvh,420px);padding:8px;border:1px solid var(--line);border-radius:17px;background:rgba(6,17,29,.96);box-shadow:0 -12px 38px rgba(0,0,0,.3);overflow:auto}
-  #game .input-card-v2{padding:8px;border:0;background:transparent}
-  #game .input-card-v2>.eyebrow,#game .input-card-v2>h2,#game .input-card-v2>p{display:none}
-  #game .search-v2 input{min-height:46px}
-  #game .results-v2{max-height:25dvh;margin-top:6px}
-  #game .message-v2{min-height:0;margin-top:5px;padding:5px 2px;border:0;background:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  #game .message-v2.cross{white-space:normal;color:#ffc0b4}
-  #game .game-status-panel-v2{position:absolute;left:8px;top:8px;z-index:640;width:min(250px,72vw);max-height:calc(100% - 24px);border:1px solid var(--line);border-radius:16px;padding:8px;background:rgba(6,17,29,.97);box-shadow:0 12px 36px rgba(0,0,0,.36);transform:translateX(calc(-100% - 18px));transition:transform .22s ease}
-  #game .mobile-status-toggle{display:block;position:absolute;z-index:650;left:10px;top:10px;border:1px solid var(--line);background:rgba(7,18,30,.92);color:#fff;border-radius:12px;min-height:40px;padding:0 12px;font-size:11px;font-weight:850;box-shadow:0 8px 24px rgba(0,0,0,.25);cursor:pointer}
-  #game .mobile-status-check:checked~.game-status-panel-v2{transform:none}
-  #game .mobile-status-check:checked+.mobile-status-toggle{left:min(268px,calc(72vw + 18px));color:var(--cyan)}
-  #game .turn-card-v2{padding:11px}
-  #game .turn-card-v2 h2{font-size:18px}
-  #game .route-panel-v2{margin-top:7px}
-  #game #route.route-v2{max-height:42vh}
-  #game .board-v2 .map-tools{top:10px;right:10px}
-  #game .board-v2 .map-hint{bottom:10px;font-size:9px;max-width:70vw}
-  #game.replay-mode .input-card-v2{display:none}
-  #game .replay-controls-v2{margin:0}
+  #game .game-layout{position:relative;height:calc(100dvh - 58px);display:block;min-height:0;overflow:hidden}
+  #game .game-layout>.panel,#game .game-layout>.board{display:block}
+  #game .board{position:absolute;inset:0 0 94px 0;min-height:0;background:#08101b}
+  #game .map-wrap{position:absolute;inset:0;height:auto;min-height:0;border:0}
+  #game #route{position:absolute;left:10px;right:74px;top:10px;z-index:520;display:flex;gap:5px;align-items:center;min-height:40px;height:40px;margin:0;padding:5px 6px;border-radius:12px;background:rgba(7,18,30,.91);box-shadow:0 8px 24px rgba(0,0,0,.25);overflow-x:auto;overflow-y:hidden}
+  #game #route::before{content:"Rutt";position:static;flex:0 0 auto;padding:0 5px;color:var(--muted);font-size:9px}
+  #game #route .route-place{width:auto;flex:0 0 auto;white-space:nowrap;padding:6px 8px;background:#081824;border:1px solid var(--line);border-radius:999px;font-size:10px}
+  #game .panel{position:absolute;left:7px;right:7px;bottom:calc(7px + env(safe-area-inset-bottom));z-index:620;max-height:min(48dvh,430px);padding:8px;border:1px solid var(--line);border-radius:17px;background:rgba(6,17,29,.96);box-shadow:0 -12px 38px rgba(0,0,0,.3);overflow:auto}
+  #game .panel>.eyebrow,#game #score{display:none}
+  #game .panel>h2{display:block;margin:0 4px 6px;padding:0;border:0;background:transparent;font-size:11px;color:var(--muted)}
+  #game .panel>h2::before{content:"Tur: ";color:#7894a1;font-weight:600}
+  #game #placeForm{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin:0;padding:0;border:0;background:transparent}
+  #game #placeForm::before{display:none}
+  #game #placeForm input{min-height:46px}
+  #game #results{display:grid;gap:6px;max-height:25dvh;margin:6px 0 0;padding:0;border:0;background:transparent;overflow:auto}
+  #game #message{min-height:0;margin:5px 2px 0;padding:3px 0 0;border:0;background:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+  #game #message.cross{white-space:normal;color:#ffc0b4}
+  #game #replayControls{margin:4px 0 0}
+  #game .map-tools{top:58px;right:10px}
+  #game .map-hint{bottom:10px;font-size:9px;max-width:70vw}
+  #game.replay-mode .panel>h2{display:none}
 }
 
 @media(max-width:480px){
