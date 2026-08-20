@@ -15,6 +15,17 @@ test('klassisk avslutas vid första korsningen',()=>{
   assert.equal(g.winner,0);
 });
 
+test('klassisk hittar korsning över datumgränsen',()=>{
+  let g=createGame({mode:'classic',players:['A','B']});
+  g=playPlace(g,p('1','A',0,170));
+  g=playPlace(g,p('2','B',10,-170));
+  g=playPlace(g,p('3','C',-10,-170));
+  g=playPlace(g,p('4','D',10,170));
+  assert.equal(g.status,'finished');
+  assert.equal(g.crossing.playerIndex,1);
+  assert.ok(Math.abs(Math.abs(g.crossing.lon)-180)<1e-8);
+});
+
 test('duell bygger separata linjer för spelarna',()=>{
   let g=createGame({mode:'duel',players:['A','B']});
   g=playPlace(g,p('a','A',0,0));
