@@ -1,16 +1,23 @@
 import {createGame,playPlace,ruleText} from './engine.js';
 import {loadPlaces,searchPlaces} from './data.js';
-import {project} from './geometry.js';
+import {createGameMap} from './map.js';
 
 const $=id=>document.getElementById(id);
 let mode='classic';
 let state=null;
 let ready=false;
+let gameMap=null;
 
 const modeName=value=>({classic:'Klassisk',solo:'Solo',duel:'Duell'})[value]||value;
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function setScreen(name){document.querySelectorAll('.screen').forEach(el=>el.classList.remove('active'));$(name).classList.add('active');}
+
+function ensureMap(){
+  if(!gameMap)gameMap=createGameMap($('map'));
+  gameMap.invalidate();
+  return gameMap;
+}
 
 function rebuildNames(){
   const count=mode==='solo'?1:2;
@@ -18,19 +25,14 @@ function rebuildNames(){
   $('names').innerHTML=Array.from({length:count},(_,i)=>`<input id="name${i}" maxlength="24" value="${i===0?'Spelare 1':'Spelare 2'}" aria-label="Namn spelare ${i+1}">`).join('');
 }
 
-function renderState(){
+function renderState({forceMapFit=false}={}){
   if(!state)return;
   $('modeBadge').textContent=modeName(state.mode);
   $('turnName').textContent=state.status==='finished'?'Match slut':state.players[state.turn].name;
   $('score').innerHTML=state.players.map((p,i)=>`<div class="player-score ${state.status==='playing'&&state.turn===i?'active':''}"><span>${esc(p.name)}</span><b>${p.moves}</b></div>`).join('');
-  $('route').innerHTML=state.places.map(p=>`<span class="p${p.playerIndex}">${esc(p.name)}</span>`).join('');
-  const svg=$('board');svg.innerHTML='';
-  for(const segment of state.segments){
-    const a=project(segment.a.lat,segment.a.lon),b=project(segment.b.lat,segment.b.lon);
-    svg.insertAdjacentHTML('beforeend',`<line x1="${a.x}" y1="${a.y}" x2="${b.x}" y2="${b.y}" class="line${segment.playerIndex}" stroke-width="5" stroke-linecap="round" opacity=".92"/>`);
-  }
-  for(const p of state.places){const pt=project(p.lat,p.lon);svg.insertAdjacentHTML('beforeend',`<circle cx="${pt.x}" cy="${pt.y}" r="7" class="city${p.playerIndex}"/><text x="${pt.x+11}" y="${pt.y-9}" fill="#dfeff5" font-size="14">${esc(p.name)}</text>`)}
-  if(state.crossing){svg.insertAdjacentHTML('beforeend',`<circle cx="${state.crossing.x}" cy="${state.crossing.y}" r="11" class="crossmark"/>`)}
+  $('route').innerHTML=state.places.map(p=>`<button type="button" class="route-place p${p.playerIndex}" data-place-id="${esc(p.id)}">${esc(p.name)}</button>`).join('');
+  if(gameMap)gameMap.render(state,{forceFit:forceMapFit});
+
   if(state.status==='finished'){
     if(state.mode==='solo')$('message').textContent=`Korsning. Du nådde ${state.players[0].moves} orter.`;
     else $('message').textContent=`${state.players[state.crossing.playerIndex].name} skapade korsningen. ${state.players[state.winner].name} vinner.`;
@@ -61,10 +63,21 @@ $('start').addEventListener('click',()=>{
   if(!ready)return;
   const count=mode==='solo'?1:2;
   const players=Array.from({length:count},(_,i)=>String($(`name${i}`)?.value||`Spelare ${i+1}`).trim()||`Spelare ${i+1}`);
-  state=createGame({mode,players});setScreen('game');renderState();$('placeInput').focus();
+  try{
+    state=createGame({mode,players});
+    setScreen('game');
+    ensureMap();
+    renderState({forceMapFit:true});
+    $('placeInput').focus();
+  }catch(error){
+    setScreen('home');
+    $('dataStatus').textContent=`⛔ Spelet kunde inte starta: ${error.message}`;
+    $('dataStatus').className='data-status bad';
+  }
 });
 
-$('back').addEventListener('click',()=>{state=null;setScreen('home')});
+$('back').addEventListener('click',()=>{state=null;gameMap?.reset();setScreen('home')});
+$('fitMap').addEventListener('click',()=>{if(state&&gameMap)gameMap.fitState(state,true)});
 
 rebuildNames();
 const demoMode=new URLSearchParams(location.search).get('demo')==='1';
