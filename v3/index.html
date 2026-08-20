@@ -26,6 +26,7 @@
           </button>
         </div>
         <p id="dataStatus" class="data-status">Verifierar ortregistret…</p>
+        <button id="historyEntry" class="history-link hidden" type="button">↺ Senaste matcher</button>
       </div>
     </section>
 
@@ -95,6 +96,16 @@
       </div>
     </section>
 
+    <section id="history" class="screen">
+      <div class="shell history-shell">
+        <button id="historyBack" class="ghost compact" type="button">← Till start</button>
+        <p class="eyebrow">MATCHHISTORIK</p>
+        <h1 class="history-title">Senaste matcher</h1>
+        <p class="lead small">Färdiga och avbrutna matcher sparas på den här enheten. Online sparas den auktoritativa journalen hos värden.</p>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </section>
+
     <section id="game" class="screen">
       <header class="game-head">
         <button id="back" class="ghost">← Avsluta</button>
@@ -108,6 +119,10 @@
           <form id="placeForm" class="search"><input id="placeInput" autocomplete="off" inputmode="search" placeholder="Sök ort…"><button id="playButton" class="primary" type="submit">Spela</button></form>
           <div id="results" class="results"></div>
           <p id="message" class="message"></p>
+          <div id="replayControls" class="replay-controls hidden">
+            <div><button id="replayPrev" class="ghost" type="button">←</button><strong id="replayStep">1 / 1</strong><button id="replayNext" class="ghost" type="button">→</button></div>
+            <button id="replayExit" class="ghost" type="button">Stäng repris</button>
+          </div>
         </aside>
         <section class="board">
           <div class="map-wrap">
