@@ -30,7 +30,7 @@ function renderState({forceMapFit=false}={}){
   $('modeBadge').textContent=modeName(state.mode);
   $('turnName').textContent=state.status==='finished'?'Match slut':state.players[state.turn].name;
   $('score').innerHTML=state.players.map((p,i)=>`<div class="player-score ${state.status==='playing'&&state.turn===i?'active':''}"><span>${esc(p.name)}</span><b>${p.moves}</b></div>`).join('');
-  $('route').innerHTML=state.places.map(p=>`<button type="button" class="route-place p${p.playerIndex}" data-place-id="${esc(p.id)}">${esc(p.name)}</button>`).join('');
+  $('route').innerHTML=state.places.map((p,index)=>`<button type="button" class="route-place p${p.playerIndex}" data-place-index="${index}">${esc(p.name)}</button>`).join('');
   if(gameMap)gameMap.render(state,{forceFit:forceMapFit});
 
   if(state.status==='finished'){
@@ -78,6 +78,12 @@ $('start').addEventListener('click',()=>{
 
 $('back').addEventListener('click',()=>{state=null;gameMap?.reset();setScreen('home')});
 $('fitMap').addEventListener('click',()=>{if(state&&gameMap)gameMap.fitState(state,true)});
+$('route').addEventListener('click',event=>{
+  const button=event.target.closest('[data-place-index]');
+  const index=Number(button?.dataset.placeIndex);
+  if(!button||!Number.isInteger(index)||!state?.places[index]||!gameMap)return;
+  gameMap.focusPlace(state.places[index]);
+});
 
 rebuildNames();
 const demoMode=new URLSearchParams(location.search).get('demo')==='1';
