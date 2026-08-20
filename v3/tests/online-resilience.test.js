@@ -10,8 +10,11 @@ class Emitter{
 }
 
 class FakeConnection extends Emitter{
-  constructor(metadata={}){super();this.metadata=metadata;this.open=false;this.other=null;this.closed=false}
-  send(message){if(this.open&&!this.closed&&this.other?.open)queueMicrotask(()=>this.other.emit('data',structuredClone(message)))}
+  constructor(metadata={}){super();this.metadata=metadata;this.open=false;this.other=null;this.closed=false;this.dropNextType=null}
+  send(message){
+    if(this.dropNextType===message?.type){this.dropNextType=null;return}
+    if(this.open&&!this.closed&&this.other?.open)queueMicrotask(()=>this.other.emit('data',structuredClone(message)));
+  }
   close(){
     if(this.closed)return;
     this.closed=true;this.open=false;
@@ -48,6 +51,7 @@ class MemoryStorage{
 }
 
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const p=(id,name,lat,lon)=>({id,name,lat,lon,countryCode:'SE',country:'Sverige'});
 const canonical=new Map([
   ['umea',p('umea','Umeå',63.8258,20.263)],
@@ -56,16 +60,16 @@ const canonical=new Map([
   ['goteborg',p('goteborg','Göteborg',57.7089,11.9746)]
 ]);
 const rawMove=(playerId,clientMoveId,place)=>({protocol:ONLINE_PROTOCOL_VERSION,type:'MOVE',playerId,clientMoveId,place});
+const resolver=id=>canonical.get(String(id))||null;
 
 async function settle(){await tick();await tick();await tick()}
+function installFakes(){registry.clear();guestCounter=0;globalThis.Peer=FakePeer;globalThis.sessionStorage=new MemoryStorage()}
+function removeFakes(){delete globalThis.Peer;delete globalThis.sessionStorage}
 
 test('anslutningen binder identitet, stoppar replay och återtar samma spelare efter omladdning',async()=>{
-  registry.clear();guestCounter=0;
-  globalThis.Peer=FakePeer;
-  globalThis.sessionStorage=new MemoryStorage();
+  installFakes();
   let hostState=null;let guestState=null;let guest2State=null;
   const hostErrors=[];
-  const resolver=id=>canonical.get(String(id))||null;
   const host=createOnlineController({resolvePlace:resolver,onState:event=>{hostState=event.state},onError:error=>hostErrors.push(error.message)});
   const guest=createOnlineController({onState:event=>{guestState=event.state}});
 
@@ -121,6 +125,49 @@ test('anslutningen binder identitet, stoppar replay och återtar samma spelare e
   assert.equal(guest2.snapshot().revision,3);
   assert.equal(guestState.places.length,3);
 
-  host.leave();guest2.leave();
-  delete globalThis.Peer;delete globalThis.sessionStorage;
+  host.leave();guest2.leave();removeFakes();
+});
+
+test('väntande drag överlever tappad kvittens och skickas säkert om efter återanslutning',async()=>{
+  installFakes();
+  let hostState=null;let guestState=null;
+  const host=createOnlineController({resolvePlace:resolver,onState:event=>{hostState=event.state}});
+  const guest=createOnlineController({onState:event=>{guestState=event.state}});
+
+  await host.createRoom({name:'Anna',code:'FGHJK',mode:'classic'});
+  await guest.joinRoom({name:'Bertil',code:'FGHJK'});
+  await settle();
+  host.startGame();await settle();
+  host.submitMove(p('umea','Umeå',0,0));await settle();
+  assert.equal(guest.snapshot().revision,1);
+  assert.equal(guest.canMove(),true);
+
+  const hostPeer=registry.get('orten3-fghjk');
+  const guestPeer=registry.get('guest-1');
+  const hostConn=hostPeer.connections[0];
+  const guestConn=guestPeer.connections[0];
+
+  // Värden tar emot draget men just STATE/kvittensen tappas på nätet.
+  hostConn.dropNextType='STATE';
+  guest.submitMove(p('stockholm','Stockholm',0,0));
+  await settle();
+  assert.equal(host.snapshot().revision,2);
+  assert.equal(hostState.places.length,2);
+  assert.equal(guest.snapshot().revision,1);
+  assert.equal(guest.snapshot().pending,true);
+
+  // Länken bryts. Samma MOVE skickas om när anslutningen kommer tillbaka.
+  guestConn.close();
+  await sleep(1700);
+  await settle();
+
+  assert.equal(guest.snapshot().status,'connected');
+  assert.equal(guest.snapshot().revision,2);
+  assert.equal(guest.snapshot().pending,false);
+  assert.equal(host.snapshot().revision,2,'återsänt drag ska dedupliceras');
+  assert.equal(hostState.places.length,2,'återsänt drag får inte spelas två gånger');
+  assert.equal(guestState.places.length,2);
+  assert.equal(host.snapshot().players[1].connected,true);
+
+  host.leave();guest.leave();removeFakes();
 });
