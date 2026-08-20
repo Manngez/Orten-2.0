@@ -1,0 +1,21 @@
+name: Testa Orten 3.0
+
+on:
+  push:
+    branches: [v3-online-flow]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Kör V3-tester
+        run: npm --prefix v3 test
