@@ -32,8 +32,10 @@ V3 har nu också:
 - Host-auktoritativa onlinedrag där fel spelare inte kan göra drag utanför sin tur.
 - State-revisioner som gör att gamla nätverkspaket ignoreras.
 - Automatisk gäståteranslutning med samma spelar-id och återleverans av senaste state.
+- Idempotenta MOVE-paket: tappade drag kan skickas om med samma drag-id utan att spelas dubbelt.
 - TURN-konfiguration via `globalThis.ORTEN_TURN` när sådan finns tillgänglig.
 - Värdverifiering av varje onlinedrags GeoNames-id mot värdens eget verifierade ortregister; klientskickade koordinater används inte som auktoritativ data.
+- Ett dolt tvåmobil-diagnostikläge som aktiveras med `?debug=1` och inte påverkar den normala spelvyn.
 
 Det lilla utvecklingsregistret finns kvar endast i explicit demoläge via `?demo=1`. Ett vanligt nätverks- eller datafel får aldrig tyst göra V3 spelbart med ofullständig data.
 
@@ -62,15 +64,39 @@ GitHub Pages-flödet kör V3:s tester, bygger hela GeoNames-registret och valide
 
 `src/online.js` ansvarar för transport, rum, lobby och återanslutning. När värden tar emot ett `MOVE` används endast ortens id för att slå upp den kanoniska orten i värdens verifierade datalager. Därefter kontrolleras spelar-id och turordning innan samma `playPlace()` som lokalspel använder får köras.
 
-Gästen accepterar bara nyare state-revisioner. Vid ett kort nätverksavbrott återansluter gästen med samma spelar-id och värden skickar senaste state igen. Spelreglerna behöver därför inte dupliceras i nätverkslagret.
+Gästens identitet binds till PeerJS-anslutningens metadata i stället för ett självrapporterat `playerId` i MOVE-paketet. Värden minns nyligen hanterade drag-id:n och kan därför kvittera ett återsänt drag utan att spela det igen.
+
+Gästen accepterar bara nyare state-revisioner. Om själva MOVE-paketet eller STATE-kvittensen försvinner behåller gästen sitt väntande drag och skickar om samma drag-id efter återanslutning. Värden skickar samtidigt senaste state igen. Spelreglerna behöver därför inte dupliceras i nätverkslagret.
+
+## Tvåmobil-diagnostik
+
+Lägg till `?debug=1` i V3-adressen för att visa den flytande panelen **Nätverksdiagnostik**. Normalt spel visar aldrig panelen.
+
+Panelen visar bland annat:
+
+- roll: värd eller gäst
+- PeerJS-status
+- rumskod och förkortat spelar-id
+- senaste accepterade state-revision
+- om ett drag väntar på kvittens
+- om den lokala klienten får spela just nu
+- vilka spelare som är anslutna
+- aktuell tur och antal drag i state
+- en tidsstämplad logg över status-, lobby-, MOVE-, STATE-, browser online/offline-, visibility- och JavaScript-felhändelser
+
+Knappen `Kopiera rapport` gör det möjligt att ta ut hela diagnostiken från en mobil. Lobbyknappen `Dela rum` skapar en direktlänk med `?room=KOD`; om värden själv kör `debug=1` följer debug-parametern med till testlänken så båda mobilerna kan logga samma test.
 
 ## Testning
 
-V3:s `npm test` kontrollerar JavaScript-syntax och kör motor-, geometri-, data-, sök- och onlineprotokolltester. `online-flow.test.js` använder en minnesbaserad PeerJS-ersättning och testar hela kedjan: skapa rum, anslut, starta match, värddrag, gästdra g och synkat state. Testet skickar även manipulerade koordinater och verifierar att värdens kanoniska ortdata används.
+V3:s `npm test` kontrollerar JavaScript-syntax för huvudflöde, online-transport och diagnostik och kör motor-, geometri-, data-, sök- och onlineprotokolltester.
+
+`online-flow.test.js` använder en minnesbaserad PeerJS-ersättning och testar hela kedjan: skapa rum, anslut, starta match, värddrag, gästdra g och synkat state. Testet skickar även manipulerade koordinater och verifierar att värdens kanoniska ortdata används.
+
+`online-resilience.test.js` täcker dessutom identitetsspoofing, replay av gamla drag-id:n, återanslutning efter omladdning, tappad STATE-kvittens och ett MOVE-paket som aldrig nådde värden. I båda paketförlustfallen ska draget efter återanslutning spelas exakt en gång.
 
 ## Nästa steg
 
-1. Webbläsartesta onlineflödet på två verkliga enheter och täta eventuella PeerJS-/mobilkantfall.
+1. Köra diagnostikläget på två verkliga enheter och använda rapporterna för eventuella PeerJS-/mobilkantfall.
 2. Gemensam matchjournal för start, progress, avslut och replay.
 3. Återupptagning av värdrum efter full siduppdatering.
 4. Gatduell som separat regelmodul ovanpå samma sessions- och nätverkslager.
