@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow,noarchive">
+  <meta name="theme-color" content="#06111d">
+  <title>Spelstarter · Orten 2.0</title>
+  <style>
+    :root{color-scheme:dark;--bg:#06111d;--panel:#0a1b29;--line:rgba(132,181,201,.18);--text:#eefaff;--muted:#8ca8b5;--cyan:#68f6ff;--green:#73f5a7;--coral:#ff8f70;--gold:#ffd86a}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 12% 8%,rgba(104,246,255,.08),transparent 32%),var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(920px,calc(100% - 24px));margin:auto;padding:26px 0 70px}.top{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:18px}.eyebrow{display:block;color:var(--cyan);font-size:11px;font-weight:900;letter-spacing:.12em}.top h1{margin:6px 0;font-size:clamp(32px,8vw,48px)}.top p{margin:0;color:var(--muted);font-size:13px;line-height:1.5}.refresh{border:1px solid var(--line);background:#0b2030;color:#e8f8ff;border-radius:14px;padding:12px 15px;font-weight:900}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}.stat{border:1px solid var(--line);border-radius:16px;padding:13px;background:linear-gradient(145deg,rgba(13,36,52,.9),rgba(6,20,31,.94))}.stat span{display:block;color:var(--muted);font-size:9px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.stat strong{display:block;margin-top:4px;font-size:22px;color:var(--cyan)}.status{padding:12px 14px;border:1px solid var(--line);border-radius:14px;margin-bottom:12px;color:var(--muted);background:rgba(255,255,255,.025);font-size:13px}.status.ok{color:#b8f5d0}.status.error{color:#ffc2b6;border-color:rgba(255,143,112,.35)}.list{display:grid;gap:9px}.row{border:1px solid var(--line);border-radius:18px;padding:15px;background:linear-gradient(145deg,rgba(13,36,52,.95),rgba(6,20,31,.96));display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.time{display:block;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px}.row strong{display:block;font-size:16px}.row small{display:block;color:#9ab2bd;margin-top:5px;line-height:1.4}.badge{align-self:start;border:1px solid rgba(104,246,255,.22);border-radius:999px;padding:7px 9px;color:var(--cyan);font-size:9px;font-weight:950;letter-spacing:.08em}.empty{padding:28px;border:1px dashed var(--line);border-radius:18px;text-align:center;color:var(--muted)}@media(max-width:620px){.wrap{padding-top:18px}.top p{display:none}.refresh{padding:10px 11px}.stats{grid-template-columns:1fr 1fr}.stat:last-child{grid-column:1/-1}.row{padding:13px}.row strong{font-size:15px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <div><span class="eyebrow">ORTEN 2.0 · INTERN VY</span><h1>Spelstarter</h1><p>En permanent logg över varje registrerad spelstart. Poster tas inte bort när matchen avslutas.</p></div>
+      <button id="refresh" class="refresh" type="button">↻ Uppdatera</button>
+    </header>
+    <section class="stats"><div class="stat"><span>Registrerade starter</span><strong id="count">0</strong></div><div class="stat"><span>Online</span><strong id="onlineCount">0</strong></div><div class="stat"><span>Senaste 24 h</span><strong id="dayCount">0</strong></div></section>
+    <div id="diagnostic" class="status" style="display:none"></div>
+    <div id="status" class="status">Hämtar spelstarter…</div>
+    <section id="list" class="list"></section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.111.0"></script>
+  <script>
+  (()=>{
+    const PROJECT_URL='https://mewauzsogkbcchnvsath.supabase.co';
+    const PUBLISHABLE_KEY='sb_publishable_lWTB9F286pzThGxYp3Zj2w_uIco-VDU';
+    const TABLE='orten_highscores';
+    const STATUS_KEY='orten2:start-log-last-status:v1';
+    const client=window.supabase.createClient(PROJECT_URL,PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false}});
+    const $=id=>document.getElementById(id);
+    const safe=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const modeText=mode=>({classic:'⚡ Klassisk',endurance:'🛡️ Tålighet',elimination:'🏆 Utslagning',duel:'⚔️ Duell',solo:'🧭 Solo',street:'🏙️ Gatduell'})[mode]||mode||'Orten';
+    const areaText=area=>({WORLD:'Världen',EUROPE:'Europa',NORDIC:'Norden',UMEA:'Umeå',SE:'Sverige',CUSTOM:'Eget område'})[area]||area||'Okänt område';
+    const dateText=stamp=>{try{return new Intl.DateTimeFormat('sv-SE',{weekday:'short',day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(new Date(stamp))}catch{return ''}};
+    let loading=false;
+
+    function parseStart(row){
+      const p=String(row?.board_key||'').split('|');
+      if(p.length!==8||p[0]!=='replay'||p[1]!=='start'||p[2]!=='1')return null;
+      const stamp=Number(p[3]);if(!Number.isFinite(stamp))return null;
+      return {stamp,id:p[4],mode:p[5],area:p[6],room:p[7]==='-'?'':p[7],first:String(row.player_name||'Spelare')};
+    }
+    function parsePlayer(row){
+      const p=String(row?.board_key||'').split('|');
+      if(p.length!==5||p[0]!=='replay'||p[1]!=='startp'||p[2]!=='1')return null;
+      return {id:p[3],index:Number(p[4])||0,name:String(row.player_name||'Spelare')};
+    }
+    function showDiagnostic(){
+      let info=null;try{info=JSON.parse(localStorage.getItem(STATUS_KEY)||'null')}catch{}
+      const el=$('diagnostic');if(!info||Date.now()-Number(info.at||0)>15*60*1000){el.style.display='none';return}
+      el.style.display='block';
+      if(info.status==='saved'){el.className='status ok';el.textContent='✓ Den senaste spelstarten sparades i startloggen.'}
+      else if(info.status==='saving'){el.className='status';el.textContent='Sparar den senaste spelstarten…'}
+      else if(info.status==='error'){el.className='status error';el.textContent=`Kunde inte spara senaste starten: ${info.message||'okänt fel'}`}
+    }
+    async function load(){
+      if(loading)return;loading=true;$('refresh').disabled=true;showDiagnostic();
+      try{
+        const [startsResult,playersResult]=await Promise.all([
+          client.from(TABLE).select('player_name,board_key,updated_at').like('board_key','replay|start|1|%').order('updated_at',{ascending:false}).limit(3000),
+          client.from(TABLE).select('player_name,board_key').like('board_key','replay|startp|1|%').limit(12000)
+        ]);
+        if(startsResult.error)throw startsResult.error;if(playersResult.error)throw playersResult.error;
+        const playerMap=new Map();
+        for(const row of playersResult.data||[]){const p=parsePlayer(row);if(!p)continue;const arr=playerMap.get(p.id)||[];arr.push(p);playerMap.set(p.id,arr)}
+        const seen=new Set();const starts=[];
+        for(const row of startsResult.data||[]){const s=parseStart(row);if(!s||seen.has(s.id))continue;seen.add(s.id);s.players=(playerMap.get(s.id)||[]).sort((a,b)=>a.index-b.index).map(x=>x.name);if(!s.players.length)s.players=[s.first];starts.push(s)}
+        starts.sort((a,b)=>b.stamp-a.stamp);
+        $('count').textContent=starts.length;
+        $('onlineCount').textContent=starts.filter(s=>s.room).length;
+        $('dayCount').textContent=starts.filter(s=>s.stamp>Date.now()-86400000).length;
+        $('status').className='status ok';$('status').textContent=starts.length?`${starts.length} spelstarter registrerade.`:'Inga spelstarter registrerade ännu.';
+        $('list').innerHTML=starts.length?starts.map(s=>`<article class="row"><div><span class="time">${safe(dateText(s.stamp))}</span><strong>${safe(modeText(s.mode))} · ${safe(areaText(s.area))}</strong><small>${safe(s.players.join(' · '))}${s.room?` · Online ${safe(s.room)}`:' · Lokalt'}</small></div><span class="badge">STARTAD</span></article>`).join(''):'<div class="empty">Starta ett nytt spel. När startloggen fungerar ska det dyka upp här inom några sekunder.</div>';
+      }catch(error){console.error(error);$('status').className='status error';$('status').textContent=`Kunde inte hämta startloggen: ${error?.message||error}`}
+      finally{loading=false;$('refresh').disabled=false}
+    }
+    $('refresh').addEventListener('click',load);
+    window.addEventListener('storage',e=>{if(e.key===STATUS_KEY){showDiagnostic();setTimeout(load,100)}});
+    window.addEventListener('focus',()=>setTimeout(load,100));
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')setTimeout(load,100)});
+    setInterval(()=>{if(document.visibilityState==='visible')load()},3000);
+    showDiagnostic();load();
+  })();
+  </script>
+</body>
+</html>
