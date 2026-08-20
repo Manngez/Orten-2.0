@@ -82,7 +82,6 @@ test('anslutningen binder identitet, stoppar replay och återtar samma spelare e
   host.startGame();
   await settle();
 
-  // Gästen försöker utge sig för att vara värden medan det är värdens tur.
   guestConn.send(rawMove('host','spoof-1',p('stockholm','Stockholm',0,0)));
   await settle();
   assert.equal(hostState.places.length,0);
@@ -92,7 +91,6 @@ test('anslutningen binder identitet, stoppar replay och återtar samma spelare e
   await settle();
   assert.equal(hostState.places[0].lat,63.8258,'värden ska använda sin kanoniska ortdata');
 
-  // Paketets playerId ignoreras: identiteten kommer från PeerJS-anslutningen.
   guestConn.send(rawMove('host','guest-move-1',p('stockholm','Stockholm',0,0)));
   await settle();
   assert.equal(hostState.places.length,2);
@@ -103,13 +101,11 @@ test('anslutningen binder identitet, stoppar replay och återtar samma spelare e
   await settle();
   assert.equal(host.snapshot().revision,3);
 
-  // Samma drag-id får aldrig kunna bli ett nytt drag när det återspelas senare.
   guestConn.send(rawMove(oldGuestId,'guest-move-1',p('goteborg','Göteborg',57.7089,11.9746)));
   await settle();
   assert.equal(hostState.places.length,3);
   assert.equal(host.snapshot().revision,3);
 
-  // Simulera att gästens sida laddas om. sessionStorage behåller spelar-id:t.
   guest.leave();
   await settle();
   assert.equal(host.snapshot().players[1].connected,false);
@@ -147,7 +143,6 @@ test('väntande drag överlever tappad kvittens och skickas säkert om efter åt
   const hostConn=hostPeer.connections[0];
   const guestConn=guestPeer.connections[0];
 
-  // Värden tar emot draget men just STATE/kvittensen tappas på nätet.
   hostConn.dropNextType='STATE';
   guest.submitMove(p('stockholm','Stockholm',0,0));
   await settle();
@@ -156,7 +151,6 @@ test('väntande drag överlever tappad kvittens och skickas säkert om efter åt
   assert.equal(guest.snapshot().revision,1);
   assert.equal(guest.snapshot().pending,true);
 
-  // Länken bryts. Samma MOVE skickas om när anslutningen kommer tillbaka.
   guestConn.close();
   await sleep(1700);
   await settle();
@@ -168,6 +162,43 @@ test('väntande drag överlever tappad kvittens och skickas säkert om efter åt
   assert.equal(hostState.places.length,2,'återsänt drag får inte spelas två gånger');
   assert.equal(guestState.places.length,2);
   assert.equal(host.snapshot().players[1].connected,true);
+
+  host.leave();guest.leave();removeFakes();
+});
+
+test('drag som aldrig nådde värden skickas om och spelas exakt en gång',async()=>{
+  installFakes();
+  let hostState=null;let guestState=null;
+  const host=createOnlineController({resolvePlace:resolver,onState:event=>{hostState=event.state}});
+  const guest=createOnlineController({onState:event=>{guestState=event.state}});
+
+  await host.createRoom({name:'Anna',code:'LMNOP',mode:'classic'});
+  await guest.joinRoom({name:'Bertil',code:'LMNOP'});
+  await settle();
+  host.startGame();await settle();
+  host.submitMove(p('umea','Umeå',0,0));await settle();
+
+  const guestPeer=registry.get('guest-1');
+  const guestConn=guestPeer.connections[0];
+  guestConn.dropNextType='MOVE';
+  guest.submitMove(p('stockholm','Stockholm',0,0));
+  await settle();
+
+  assert.equal(host.snapshot().revision,1,'värden ska ännu inte ha sett draget');
+  assert.equal(hostState.places.length,1);
+  assert.equal(guest.snapshot().pending,true);
+
+  guestConn.close();
+  await sleep(1700);
+  await settle();
+
+  assert.equal(guest.snapshot().status,'connected');
+  assert.equal(host.snapshot().revision,2);
+  assert.equal(guest.snapshot().revision,2);
+  assert.equal(guest.snapshot().pending,false);
+  assert.equal(hostState.places.length,2);
+  assert.equal(hostState.places[1].name,'Stockholm');
+  assert.equal(guestState.places.length,2);
 
   host.leave();guest.leave();removeFakes();
 });
