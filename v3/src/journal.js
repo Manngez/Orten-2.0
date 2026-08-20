@@ -1,6 +1,7 @@
-import {isGameState} from './engine.js';
+import {isGameState,playPlace} from './engine.js';
 
 export const MATCH_JOURNAL_VERSION=1;
+export const MATCH_STORAGE_VERSION=1;
 export const MATCH_HISTORY_KEY='orten3:match-history:v1';
 const clone=value=>structuredClone(value);
 
@@ -30,6 +31,17 @@ function entry(state,{event='state',revision=null,at=Date.now()}={}){
   return {seq:0,event:String(event||'state'),revision,at:Number(at)||Date.now(),key:stateKey(state),state:clone(state)};
 }
 
+function cleanReplayPlace(place){
+  return {
+    id:String(place.id),name:String(place.name),country:String(place.country||''),countryCode:String(place.countryCode||''),region:String(place.region||''),lat:Number(place.lat),lon:Number(place.lon)
+  };
+}
+
+function resolveStorage(storage){
+  if(storage!==undefined)return storage;
+  try{return globalThis.localStorage||null}catch{return null}
+}
+
 export function createMatchJournal(state,{id=makeId(),source='local',roomCode='',revision=null,at=Date.now()}={}){
   const first=entry(state,{event:'start',revision,at});
   return {
@@ -40,7 +52,7 @@ export function createMatchJournal(state,{id=makeId(),source='local',roomCode=''
     mode:state.mode,
     players:state.players.map(player=>({id:player.id,onlineId:player.onlineId||null,name:player.name})),
     startedAt:first.at,
-    endedAt:null,
+    endedAt:state.status==='finished'?first.at:null,
     status:state.status==='finished'?'finished':'playing',
     winner:state.winner,
     entries:[first]
@@ -80,27 +92,68 @@ export function replayMatchState(journal,seq){
   return clone(journal.entries[seq].state);
 }
 
+export function compactMatchJournal(journal){
+  assertJournal(journal);
+  const first=journal.entries[0];
+  if(!first||!isGameState(first.state))throw new Error('Matchjournalen saknar giltigt start-state.');
+  const steps=[];
+  for(let i=1;i<journal.entries.length;i++){
+    const previous=journal.entries[i-1];
+    const current=journal.entries[i];
+    if(!isGameState(current.state)||current.state.places.length!==previous.state.places.length+1)throw new Error('Matchjournalen innehåller ett state som inte kan kompakteras.');
+    steps.push({event:current.event,revision:current.revision,at:current.at,place:cleanReplayPlace(current.state.places.at(-1))});
+  }
+  return {
+    storageVersion:MATCH_STORAGE_VERSION,
+    journalVersion:MATCH_JOURNAL_VERSION,
+    id:journal.id,source:journal.source,roomCode:journal.roomCode,mode:journal.mode,players:clone(journal.players),startedAt:journal.startedAt,endedAt:journal.endedAt,status:journal.status,winner:journal.winner,
+    start:{revision:first.revision,at:first.at,state:clone(first.state)},
+    steps
+  };
+}
+
+export function expandMatchJournal(stored){
+  if(!stored||stored.storageVersion!==MATCH_STORAGE_VERSION||stored.journalVersion!==MATCH_JOURNAL_VERSION||!stored.start?.state||!Array.isArray(stored.steps))throw new Error('Ogiltigt kompakt journalformat.');
+  let state=clone(stored.start.state);
+  let journal=createMatchJournal(state,{id:stored.id,source:stored.source,roomCode:stored.roomCode,revision:stored.start.revision,at:stored.start.at});
+  for(const step of stored.steps){
+    state=playPlace(state,step.place);
+    journal=appendMatchState(journal,state,{event:step.event,revision:step.revision,at:step.at});
+  }
+  if(stored.status==='abandoned')journal=abandonMatchJournal(journal,{at:stored.endedAt||Date.now()});
+  if(journal.status!==stored.status)throw new Error('Den kompakta journalens slutstatus stämmer inte med replay.');
+  if(journal.winner!==stored.winner)throw new Error('Den kompakta journalens vinnare stämmer inte med replay.');
+  journal.startedAt=stored.startedAt;
+  journal.endedAt=stored.endedAt;
+  return journal;
+}
+
 export function serializeMatchJournal(journal){assertJournal(journal);return JSON.stringify(journal)}
 export function parseMatchJournal(raw){
   let journal;
   try{journal=typeof raw==='string'?JSON.parse(raw):clone(raw)}catch{throw new Error('Matchjournalen innehåller ogiltig JSON.');}
+  if(journal?.storageVersion!==undefined)return expandMatchJournal(journal);
   assertJournal(journal);
   for(const item of journal.entries){if(!item||!Number.isInteger(item.seq)||!isGameState(item.state))throw new Error('Matchjournalen innehåller en ogiltig replay-post.');}
   return journal;
 }
 
-export function saveMatchJournal(journal,{storage=globalThis.localStorage,key=MATCH_HISTORY_KEY,limit=20}={}){
+export function saveMatchJournal(journal,{storage,key=MATCH_HISTORY_KEY,limit=20}={}){
   assertJournal(journal);
+  storage=resolveStorage(storage);
   if(!storage?.getItem||!storage?.setItem)return false;
-  let history=[];
-  try{const parsed=JSON.parse(storage.getItem(key)||'[]');if(Array.isArray(parsed))history=parsed}catch{}
-  const clean=history.filter(item=>item?.id!==journal.id);
-  clean.unshift(clone(journal));
-  storage.setItem(key,JSON.stringify(clean.slice(0,Math.max(1,Number(limit)||20))));
-  return true;
+  try{
+    let history=[];
+    try{const parsed=JSON.parse(storage.getItem(key)||'[]');if(Array.isArray(parsed))history=parsed}catch{}
+    const clean=history.filter(item=>item?.id!==journal.id);
+    clean.unshift(compactMatchJournal(journal));
+    storage.setItem(key,JSON.stringify(clean.slice(0,Math.max(1,Number(limit)||20))));
+    return true;
+  }catch{return false}
 }
 
-export function loadMatchHistory({storage=globalThis.localStorage,key=MATCH_HISTORY_KEY}={}){
+export function loadMatchHistory({storage,key=MATCH_HISTORY_KEY}={}){
+  storage=resolveStorage(storage);
   if(!storage?.getItem)return [];
   try{
     const parsed=JSON.parse(storage.getItem(key)||'[]');
