@@ -1,4 +1,4 @@
-name: Publicera Orten 2.0
+name: Publicera Orten 3.0
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: orten2-pages
+  group: orten-pages
   cancel-in-progress: true
 
 jobs:
@@ -38,16 +38,13 @@ jobs:
       - name: Vägra publicera ofullständig ortdata
         run: node scripts/validate-world-data.mjs
 
-      - name: Versionsmärk klienten och aktivera startloggen
+      - name: Verifiera att huvudadressen använder Orten 3.0
         shell: bash
         run: |
-          BUILD="${GITHUB_SHA::12}"
-          sed -i -E "s|href=\"styles.css(\?v=[^\"]*)?\"|href=\"styles.css?v=$BUILD\"|" index.html
-          sed -i -E "s|src=\"data.js(\?v=[^\"]*)?\"|src=\"data.js?v=$BUILD\"|" index.html
-          sed -i -E "s|src=\"app.js(\?v=[^\"]*)?\"|src=\"app.js?v=$BUILD\"|" index.html
-          if ! grep -q 'app-start-log.js' index.html; then
-            sed -i "s|</body>|  <script src=\"app-start-log.js?v=$BUILD\"></script>\n</body>|" index.html
-          fi
+          grep -q '<base href="./v3/">' index.html
+          grep -q 'ORTEN 3.0' index.html
+          test -f v3/src/main.js
+          test -f v3/app.css
 
       - uses: actions/configure-pages@v5
 
