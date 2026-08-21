@@ -1,258 +1,158 @@
 <!doctype html>
 <html lang="sv">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#07111f" />
-  <meta name="description" content="Orten 2.0 – ett världsomspännande geografispel där orter binds ihop utan att rutten korsar sig." />
-  <title>Orten 2.0</title>
-  <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="preconnect" href="https://tile.openstreetmap.org" crossorigin />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
-  <link rel="stylesheet" href="styles.css?v=20260819-2342" />
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#06111d">
+  <meta name="description" content="Orten 3.0 – bygg geografiska rutter och undvik linjekorsningar.">
+  <title>Orten 3.0</title>
+  <base href="./v3/">
+  <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="./app.css">
+  <link rel="stylesheet" href="./entry-guide.css">
 </head>
 <body>
-  <div class="ambient ambient-a" aria-hidden="true"></div>
-  <div class="ambient ambient-b" aria-hidden="true"></div>
-
-  <main id="setupScreen" class="screen active setup-shell">
-    <header class="topbar wrap">
-      <img class="brand-logo" src="assets/logo.svg" alt="Orten 2.0" />
-      <div class="topbar-actions">
-        <button class="icon-button" id="soundButton" type="button" aria-label="Ljud på eller av">🔊</button>
-        <button class="ghost-button" id="howToButton" type="button">Så spelar du</button>
-      </div>
-    </header>
-
-    <section class="hero wrap">
-      <div class="hero-copy">
-        <span class="eyebrow">EN ORT I TAGET · UNDVIK KORSNINGEN</span>
-        <h1>Välj. Starta. <span>Rita rutten.</span></h1>
-        <p>Tre enkla steg innan spelet börjar. Allt annat sköts automatiskt.</p>
-      </div>
-      <div class="globe-card" aria-hidden="true">
-        <svg class="globe-art" viewBox="0 0 420 420">
-          <defs>
-            <radialGradient id="globeFill"><stop stop-color="#15304a"/><stop offset="1" stop-color="#081424"/></radialGradient>
-            <linearGradient id="routeG" x1="0" x2="1"><stop stop-color="#68f6ff"/><stop offset="1" stop-color="#ff8f70"/></linearGradient>
-            <filter id="softGlow"><feGaussianBlur stdDeviation="5" result="g"/><feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-          </defs>
-          <circle cx="210" cy="210" r="156" fill="url(#globeFill)" stroke="#2f6077" stroke-width="2"/>
-          <ellipse cx="210" cy="210" rx="156" ry="62" fill="none" stroke="#315268" stroke-width="1.4"/>
-          <ellipse cx="210" cy="210" rx="90" ry="156" fill="none" stroke="#315268" stroke-width="1.4"/>
-          <path d="M54 210h312M84 132c78 42 174 42 252 0M84 288c78-42 174-42 252 0" fill="none" stroke="#315268" stroke-width="1.4"/>
-          <path d="M99 252 C148 138 206 316 287 151 C320 86 338 139 350 176" fill="none" stroke="url(#routeG)" stroke-width="6" stroke-linecap="round" filter="url(#softGlow)"/>
-          <g fill="#081424" stroke="#68f6ff" stroke-width="5">
-            <circle cx="100" cy="250" r="9"/><circle cx="181" cy="207" r="9"/><circle cx="264" cy="196" r="9"/><circle cx="333" cy="128" r="9"/>
-          </g>
-          <circle cx="287" cy="151" r="12" fill="#ff8f70" stroke="#fff" stroke-width="4"/>
-          <path d="M278 142l18 18m0-18-18 18" stroke="#081424" stroke-width="4" stroke-linecap="round"/>
-        </svg>
+  <main id="app">
+    <section id="entry" class="screen active">
+      <div class="shell hero entry-hero">
+        <p class="eyebrow">ORTEN 3.0</p>
+        <h1>Bygg en rutt.<br>Undvik korsningen.</h1>
+        <p class="lead entry-explainer"><strong>Ni turas om att skriva orter.</strong> Varje ny ort kopplas till den föregående med en rak linje på kartan. Fortsätt bygga rutten — men skapa inte en linje som korsar en tidigare linje.</p>
+        <div class="how-it-works" aria-label="Så fungerar Orten">
+          <article class="how-step"><span>1</span><div><b>Skriv en ort</b><small>Välj en riktig ort i det spelområde ni har valt.</small></div></article>
+          <article class="how-step"><span>2</span><div><b>Bygg vidare på rutten</b><small>Spelet drar automatiskt en linje från föregående ort till den nya.</small></div></article>
+          <article class="how-step"><span>3</span><div><b>Undvik korsningen</b><small>I klassiskt läge förlorar spelaren som först skapar en linjekorsning.</small></div></article>
+        </div>
+        <p class="route-example">Exempel: <strong>Umeå → Stockholm → Oslo → Köpenhamn → …</strong></p>
+        <div class="entry-grid">
+          <button id="localEntry" class="entry-card" type="button">
+            <span class="entry-icon">📱</span><b>En enhet</b><small>Spela tillsammans på samma mobil, surfplatta eller dator.</small><em>Fortsätt →</em>
+          </button>
+          <button id="onlineEntry" class="entry-card featured" type="button">
+            <span class="entry-icon">🌐</span><b>Online</b><small>Skapa ett rum eller anslut med en enkel rumskod.</small><em>Fortsätt →</em>
+          </button>
+        </div>
+        <p id="dataStatus" class="data-status">Verifierar ortregistret…</p>
+        <button id="historyEntry" class="history-link hidden" type="button">↺ Senaste matcher</button>
       </div>
     </section>
 
-    <section class="wrap setup-grid">
-      <div class="setup-main">
-        <div id="presetGrid" class="hidden" aria-hidden="true"></div>
-
-        <section class="panel">
-          <div class="panel-heading"><div><span class="step-kicker">1 · SPELLÄGE</span><h2>Hur vill ni spela?</h2></div></div>
-          <div id="modeGrid" class="mode-grid">
-            <button type="button" class="mode-card selected" data-mode="classic"><span class="mode-icon">⚡</span><strong>Klassisk</strong><small>Första linjekorsningen avslutar spelet.</small></button>
-            <button type="button" class="mode-card" data-mode="endurance"><span class="mode-icon">🛡️</span><strong>Tålighet</strong><small>Flera korsningar tillåts innan förlust.</small></button>
-            <button type="button" class="mode-card" data-mode="elimination"><span class="mode-icon">🏆</span><strong>Utslagning</strong><small>Korsar du åker du ut. Sista spelaren vinner.</small></button>
-            <button type="button" class="mode-card" data-mode="solo"><span class="mode-icon">🧭</span><strong>Solo</strong><small>Jaga ditt eget rekord.</small></button>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-heading"><div><span class="step-kicker">2 · OMRÅDE</span><h2>Var spelar ni?</h2></div><span id="scopeCount" class="count-pill">🇸🇪 Sverige</span></div>
-          <div class="segmented" id="scopeTabs">
-            <button type="button" class="active" data-area="sweden">🇸🇪 Sverige</button>
-            <button type="button" data-area="nordic">❄️ Norden</button>
-            <button type="button" data-area="europe">🌍 Europa</button>
-            <button type="button" data-area="world">🌐 Världen</button>
-          </div>
-
-          <div class="hidden" aria-hidden="true">
-            <div id="continentBox" class="hidden"><select id="continentSelect"></select></div>
-            <div id="countryBox" class="hidden"><select id="countrySelect"></select></div>
-            <div id="customBox" class="hidden"><input id="countrySearch" type="search" /><button id="clearCountriesButton" type="button">Rensa</button><div id="countryChips"></div></div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-heading"><div><span class="step-kicker">3 · SPELREGLER</span><h2>Finjustera om ni vill</h2></div><span class="panel-hint">Standardvalen fungerar direkt</span></div>
-          <div class="rules-grid">
-            <div class="field-card" id="playersCard">
-              <div class="field-card-head"><span>Spelare</span><select id="playerCountSelect" class="mini-select"></select></div>
-              <div id="playerInputs" class="player-inputs"></div>
-            </div>
-            <div class="field-card" id="strikeCard">
-              <label for="strikeLimitSelect">Korsningar innan förlust</label>
-              <select id="strikeLimitSelect" class="select"><option value="2">2 korsningar</option><option value="3">3 korsningar</option><option value="4">4 korsningar</option><option value="5">5 korsningar</option></select>
-              <small>Visas bara i Tålighet.</small>
-            </div>
-            <div class="field-card">
-              <label for="timerSelect">Turtid</label>
-              <select id="timerSelect" class="select"><option value="0">Ingen tidsgräns</option><option value="30">30 sekunder</option><option value="45">45 sekunder</option><option value="60">60 sekunder</option><option value="90">90 sekunder</option></select>
-              <small>Ingen tidsgräns är standard.</small>
-            </div>
-            <div class="field-card">
-              <label for="duplicateSelect">Samma ort igen</label>
-              <select id="duplicateSelect" class="select"><option value="exact">Samma faktiska plats får inte återanvändas</option><option value="nameCountry">Samma namn i samma land blockeras</option><option value="allow">Tillåt återanvändning</option></select>
-              <small>Orter med samma namn men olika positioner hålls isär.</small>
-            </div>
-          </div>
-
-          <div class="field-card" style="margin-top:12px">
-            <label>Kartutseende</label>
-            <div id="themeGrid" class="theme-grid">
-              <button type="button" class="theme-card selected" data-theme="night"><span class="theme-preview theme-night"></span><strong>Natt</strong></button>
-              <button type="button" class="theme-card" data-theme="atlas"><span class="theme-preview theme-atlas"></span><strong>Atlas</strong></button>
-              <button type="button" class="theme-card" data-theme="paper"><span class="theme-preview theme-paper"></span><strong>Papper</strong></button>
-            </div>
-            <small>Bakgrundskartan är fortfarande utan ortnamn i alla tre lägen.</small>
-          </div>
-
-          <div class="hidden" aria-hidden="true">
-            <div id="placeTypeOptions">
-              <label class="option-row selected"><input type="radio" name="placeType" value="any" checked><span>Alla orter</span></label>
-              <label class="option-row"><input type="radio" name="placeType" value="urban"><span>Större orter</span></label>
-              <label class="option-row"><input type="radio" name="placeType" value="city"><span>Städer</span></label>
-            </div>
-            <input id="autoFollowToggle" type="checkbox" checked />
-            <input id="labelsToggle" type="checkbox" />
-          </div>
-        </section>
-      </div>
-
-      <aside class="setup-summary panel">
-        <span class="step-kicker">DIN MATCH</span>
-        <h2>Redo?</h2>
-        <div id="summaryVisual" class="summary-visual">
-          <div class="mini-globe"><span>🌍</span><i></i><i></i><i></i></div>
+    <section id="home" class="screen">
+      <div class="shell hero setup-shell">
+        <button id="homeBack" class="ghost compact" type="button">← Till start</button>
+        <p class="eyebrow">EN ENHET</p>
+        <h1 class="setup-title">Välj spelläge.</h1>
+        <p class="lead">Välj spelläge, område och spelarnas namn. Sedan startar ni.</p>
+        <div class="mode-grid" id="modeGrid">
+          <button data-mode="classic" class="mode selected"><b>⚡ Klassisk</b><span>Första korsningen avgör.</span></button>
+          <button data-mode="solo" class="mode"><b>🧭 Solo</b><span>Bygg längsta möjliga rutt.</span></button>
+          <button data-mode="duel" class="mode"><b>⚔️ Duell</b><span>Var sin rutt. Korsning med någon linje räknas.</span></button>
         </div>
-        <div id="summaryRows" class="summary-rows"></div>
-        <button id="startButton" class="primary-button start-button" type="button"><span>Starta spelet</span><b>→</b></button>
-      </aside>
+        <section class="setup-option-block">
+          <span class="eyebrow">OMRÅDE</span>
+          <h2>Vilka länder ska vara med?</h2>
+          <div id="localCountryPicker" class="country-picker"></div>
+        </section>
+        <div id="names" class="names"></div>
+        <button id="start" class="primary full" disabled>Starta spel</button>
+      </div>
     </section>
 
-    <footer class="wrap footer">Orten 2.0 · Ortsdata från GeoNames · Kartdata från OpenStreetMap/CARTO.</footer>
-  </main>
+    <section id="online" class="screen">
+      <div class="shell hero online-shell">
+        <button id="onlineBack" class="ghost compact" type="button">← Till start</button>
+        <p class="eyebrow">ONLINE</p>
+        <h1 class="setup-title">Spela på varsin enhet.</h1>
+        <p class="lead">En spelare skapar rummet. Den andra skriver in rumskoden.</p>
+        <div id="onlineChoice" class="entry-grid online-choice">
+          <button id="showCreate" class="entry-card featured" type="button"><span class="entry-icon">＋</span><b>Skapa rum</b><small>Du blir värd och väljer spelregler.</small><em>Skapa →</em></button>
+          <button id="showJoin" class="entry-card" type="button"><span class="entry-icon">↗</span><b>Anslut till rum</b><small>Skriv ditt namn och rumskoden.</small><em>Anslut →</em></button>
+        </div>
 
-  <main id="gameScreen" class="screen game-screen">
-    <header class="game-topbar">
-      <button id="exitGameButton" class="icon-button solid" type="button" aria-label="Avsluta spelet">←</button>
-      <img src="assets/logo.svg" class="game-logo" alt="Orten 2.0" />
-      <div class="game-status-row">
-        <span id="scopeBadge" class="status-badge">🌍 Världen</span>
-        <span id="modeBadge" class="status-badge accent">⚡ Klassisk</span>
+        <div id="createForm" class="online-form hidden">
+          <button class="text-back" type="button" data-online-choice>← Byt val</button>
+          <label class="field"><span>Ditt namn</span><input id="hostName" maxlength="24" autocomplete="name" value="Spelare 1"></label>
+          <label class="field"><span>Rumskod</span><div class="code-row"><input id="createCode" maxlength="6" autocomplete="off"><button id="newCode" class="ghost" type="button">Ny kod</button></div></label>
+          <button id="createRoom" class="primary full" type="button">Skapa rum</button>
+        </div>
+
+        <div id="joinForm" class="online-form hidden">
+          <button class="text-back" type="button" data-online-choice>← Byt val</button>
+          <label class="field"><span>Ditt namn</span><input id="guestName" maxlength="24" autocomplete="name" value="Spelare 2"></label>
+          <label class="field"><span>Rumskod</span><input id="joinCode" maxlength="6" autocomplete="off" autocapitalize="characters" inputmode="text" placeholder="ABCDE"></label>
+          <button id="joinRoom" class="primary full" type="button">Anslut</button>
+        </div>
+        <p id="onlineStatus" class="data-status"></p>
       </div>
-      <button id="pauseButton" class="icon-button solid" type="button" aria-label="Pausa spelet">Ⅱ</button>
-    </header>
+    </section>
 
-    <section class="game-layout">
-      <aside class="game-sidebar left-panel">
-        <div class="turn-card">
-          <span class="step-kicker">AKTUELL TUR</span>
-          <div class="turn-player"><i id="turnDot"></i><div><strong id="currentPlayerName">Spelare 1</strong><small id="turnSubtext">Välj nästa ort</small></div></div>
-          <div id="timerWrap" class="timer-wrap hidden"><div class="timer-track"><i id="timerBar"></i></div><span id="timerText">60</span></div>
-        </div>
-        <div id="scoreboard" class="scoreboard"></div>
-        <div class="route-panel">
-          <div class="route-head"><strong>Valda orter</strong><span id="routeCount">0</span></div>
-          <ol id="routeList" class="route-list"></ol>
-        </div>
-      </aside>
+    <section id="lobby" class="screen">
+      <div class="shell lobby-shell">
+        <div class="lobby-top"><button id="leaveLobby" class="ghost compact" type="button">← Lämna</button><span id="lobbyConnection" class="connection-badge">Ansluter…</span></div>
+        <p class="eyebrow">SPELRUM</p>
+        <div class="room-code-card"><div><span>Rumskod</span><strong id="roomCode">-----</strong></div><button id="copyCode" class="ghost" type="button">Kopiera</button></div>
+        <section class="lobby-card">
+          <div class="section-head"><div><span class="eyebrow">SPELARE</span><h2>Rummet</h2></div><b id="lobbyCount">1 / 2</b></div>
+          <div id="lobbyPlayers" class="lobby-players"></div>
+        </section>
+        <section id="hostSettings" class="lobby-card hidden">
+          <span class="eyebrow">SPELREGLER</span><h2>Välj spelläge</h2>
+          <div id="onlineModeGrid" class="online-mode-grid">
+            <button class="mode selected" data-online-mode="classic" type="button"><b>⚡ Klassisk</b><span>En gemensam rutt. Första korsningen förlorar.</span></button>
+            <button class="mode" data-online-mode="duel" type="button"><b>⚔️ Duell</b><span>Var sin rutt. Alla tidigare linjer räknas.</span></button>
+          </div>
+          <div class="online-country-block">
+            <span class="eyebrow">OMRÅDE</span><h2>Vilka länder ska vara med?</h2>
+            <div id="onlineCountryPicker" class="country-picker"></div>
+          </div>
+          <button id="startOnline" class="primary full" type="button" disabled>Väntar på spelare…</button>
+        </section>
+        <section id="guestWaiting" class="lobby-card hidden"><span class="eyebrow">REDO</span><h2>Väntar på värden</h2><p class="lead small">När värden startar matchen öppnas kartan automatiskt på båda enheterna.</p><p id="guestCountrySummary" class="country-guest-summary">Område: Sverige</p></section>
+        <p id="lobbyMessage" class="data-status"></p>
+      </div>
+    </section>
 
-      <section class="map-stage">
-        <div id="map" class="map theme-night" aria-label="Spelkarta"></div>
-        <div class="map-vignette" aria-hidden="true"></div>
-        <div class="map-controls" aria-label="Kartkontroller">
-          <button id="zoomInButton" type="button" title="Zooma in">＋</button>
-          <button id="zoomOutButton" type="button" title="Zooma ut">−</button>
-          <span></span>
-          <button id="latestButton" type="button" title="Gå till senaste ort">◎</button>
-          <button id="fitButton" type="button" title="Visa rutten">⌗</button>
-          <button id="followButton" class="active" type="button" title="Smart kartföljning">⌁</button>
-          <button id="fullscreenButton" type="button" title="Helskärm">⛶</button>
-        </div>
-        <div id="mapInteractionHint" class="map-hint">Dra, nyp eller scrolla fritt · automatisk följning pausar när du navigerar</div>
-        <div id="crossBanner" class="cross-banner hidden"><span>⚠</span><div><strong>Linjen korsades</strong><small id="crossBannerText"></small></div></div>
-      </section>
+    <section id="history" class="screen">
+      <div class="shell history-shell">
+        <button id="historyBack" class="ghost compact" type="button">← Till start</button>
+        <p class="eyebrow">MATCHHISTORIK</p>
+        <h1 class="history-title">Senaste matcher</h1>
+        <p class="lead small">Färdiga och avbrutna matcher sparas på den här enheten. Online sparas den auktoritativa journalen hos värden.</p>
+        <div id="historyList" class="history-list"></div>
+      </div>
+    </section>
 
-      <aside class="game-sidebar input-panel">
-        <div class="input-card">
-          <span class="step-kicker">NÄSTA PLATS</span>
-          <h2>Skriv en ort</h2>
-          <p id="inputScopeText">Sökningen gäller hela världen.</p>
-          <form id="placeForm" autocomplete="off">
-            <label class="game-search"><span>⌕</span><input id="placeInput" type="text" inputmode="search" placeholder="t.ex. Umeå eller Springfield, Illinois" maxlength="120" aria-label="Ort" /><button id="playButton" type="submit">Spela</button></label>
-          </form>
-          <div id="searchState" class="search-state">Tips: lägg till land eller region om namnet är vanligt.</div>
-          <div id="recentChoices" class="recent-choices"></div>
-        </div>
-        <div class="rule-reminder"><span>🧩</span><div><strong>Dubbla ortsnamn är tillåtna</strong><p>Så länge de verkligen är olika platser. Orten 2.0 identifierar platsen bakom namnet – inte bara texten du skrev.</p></div></div>
-        <button id="restartButton" class="ghost-button wide" type="button">Starta om med samma inställningar</button>
-      </aside>
+    <section id="game" class="screen">
+      <header class="game-head">
+        <button id="back" class="ghost">← Avsluta</button>
+        <strong>ORTEN 3.0</strong>
+        <div class="game-badges"><span id="networkBadge" class="network-badge hidden">Online</span><span id="modeBadge">Klassisk</span></div>
+      </header>
+      <div class="game-layout">
+        <aside class="panel">
+          <span class="eyebrow">TUR</span><h2 id="turnName">Spelare 1</h2>
+          <div id="score" class="score"></div>
+          <form id="placeForm" class="search"><input id="placeInput" autocomplete="off" inputmode="search" placeholder="Sök ort…"><button id="playButton" class="primary" type="submit">Spela</button></form>
+          <div id="results" class="results"></div>
+          <p id="message" class="message"></p>
+          <div id="replayControls" class="replay-controls hidden">
+            <div><button id="replayPrev" class="ghost" type="button">←</button><strong id="replayStep">1 / 1</strong><button id="replayNext" class="ghost" type="button">→</button></div>
+            <button id="replayExit" class="ghost" type="button">Stäng repris</button>
+          </div>
+        </aside>
+        <section class="board">
+          <div class="map-wrap">
+            <div id="map" class="map" aria-label="Spelkarta"></div>
+            <div class="map-tools"><button id="fitMap" class="map-button" type="button">Visa rutten</button></div>
+            <div class="map-hint">Dra och zooma fritt · kartan följer nästa ort automatiskt</div>
+          </div>
+          <div id="route" class="route" aria-label="Spelade orter"></div>
+        </section>
+      </div>
     </section>
   </main>
-
-  <div id="placeModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="placeModalTitle">
-    <div class="modal-backdrop"></div>
-    <section class="modal-card place-modal-card">
-      <button class="modal-close" id="placeModalClose" type="button" aria-label="Stäng">×</button>
-      <span class="step-kicker">FLERA TRÄFFAR</span>
-      <h2 id="placeModalTitle">Vilken ort menar du?</h2>
-      <p id="placeModalText">Välj rätt plats. Land, region och koordinater visas så att två orter med samma namn aldrig blandas ihop.</p>
-      <div id="placeChoices" class="place-choices"></div>
-      <div class="modal-tip">Hittar du inte rätt? Stäng och skriv mer specifikt, till exempel <strong>Springfield, Illinois</strong>.</div>
-    </section>
-  </div>
-
-  <div id="resultModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
-    <div class="modal-backdrop"></div>
-    <section class="modal-card result-card">
-      <div id="resultIcon" class="result-icon">⚡</div>
-      <span class="step-kicker">RESULTAT</span>
-      <h2 id="resultTitle">Rutten korsades</h2>
-      <p id="resultText"></p>
-      <div id="resultStats" class="result-stats"></div>
-      <div class="result-actions">
-        <button id="continueButton" class="primary-button hidden" type="button">Fortsätt</button>
-        <button id="playAgainButton" class="primary-button" type="button">Spela igen</button>
-        <button id="changeSettingsButton" class="ghost-button" type="button">Ändra inställningar</button>
-      </div>
-    </section>
-  </div>
-
-  <div id="pauseModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
-    <div class="modal-backdrop"></div>
-    <section class="modal-card result-card compact-modal">
-      <div class="result-icon">Ⅱ</div><h2 id="pauseTitle">Pausat</h2><p>Klockan står still och inga drag kan göras.</p>
-      <button id="resumeButton" class="primary-button" type="button">Fortsätt spela</button>
-    </section>
-  </div>
-
-  <div id="howToModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="howToTitle">
-    <div class="modal-backdrop"></div>
-    <section class="modal-card howto-card">
-      <button class="modal-close" id="howToClose" type="button" aria-label="Stäng">×</button>
-      <span class="step-kicker">SÅ SPELAR DU</span><h2 id="howToTitle">En ort i taget. Ingen linjekorsning.</h2>
-      <div class="howto-grid">
-        <article><b>1</b><strong>Välj en ort</strong><p>Sök efter en riktig ort inom det område ni valt.</p></article>
-        <article><b>2</b><strong>Rutten växer</strong><p>Varje ny ort kopplas ihop med den föregående på kartan.</p></article>
-        <article><b>3</b><strong>Undvik korsningen</strong><p>Om den nya sträckan skär en äldre sträcka träffas spelets korsningsregel.</p></article>
-        <article><b>4</b><strong>Vanliga namn?</strong><p>Flera träffar visas med region, land och koordinat. Du väljer rätt plats innan draget räknas.</p></article>
-      </div>
-    </section>
-  </div>
-
-  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
-
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="data.js?v=20260819-2342"></script>
-  <script src="app.js?v=20260819-2342"></script>
+  <script type="module" src="./src/main.js"></script>
 </body>
 </html>
