@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
   <link rel="stylesheet" href="./app.css">
+  <link rel="stylesheet" href="./entry-guide.css">
 </head>
 <body>
   <main id="app">
@@ -16,7 +17,13 @@
       <div class="shell hero entry-hero">
         <p class="eyebrow">ORTEN 3.0</p>
         <h1>Bygg en rutt.<br>Undvik korsningen.</h1>
-        <p class="lead">Välj bara hur ni vill spela. Reglerna ställer ni in i nästa steg.</p>
+        <p class="lead entry-explainer"><strong>Ni turas om att skriva orter.</strong> Varje ny ort kopplas till den föregående med en rak linje på kartan. Fortsätt bygga rutten — men skapa inte en linje som korsar en tidigare linje.</p>
+        <div class="how-it-works" aria-label="Så fungerar Orten">
+          <article class="how-step"><span>1</span><div><b>Skriv en ort</b><small>Välj en riktig ort i det spelområde ni har valt.</small></div></article>
+          <article class="how-step"><span>2</span><div><b>Bygg vidare på rutten</b><small>Spelet drar automatiskt en linje från föregående ort till den nya.</small></div></article>
+          <article class="how-step"><span>3</span><div><b>Undvik korsningen</b><small>I klassiskt läge förlorar spelaren som först skapar en linjekorsning.</small></div></article>
+        </div>
+        <p class="route-example">Exempel: <strong>Umeå → Stockholm → Oslo → Köpenhamn → …</strong></p>
         <div class="entry-grid">
           <button id="localEntry" class="entry-card" type="button">
             <span class="entry-icon">📱</span><b>En enhet</b><small>Spela tillsammans på samma mobil, surfplatta eller dator.</small><em>Fortsätt →</em>
