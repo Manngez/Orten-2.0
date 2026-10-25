@@ -1,3 +1,4 @@
+import {createServerOnlineController} from './server-online.js';
 import {createGame} from './engine.js';
 import {applyMoveMessage,acceptStateMessage,createMoveMessage,createStateMessage,ONLINE_PROTOCOL_VERSION} from './online-protocol.js';
 
@@ -28,6 +29,7 @@ async function loadPeer(){
 }
 
 export function createOnlineController(callbacks={}){
+  if(globalThis.ORTEN_SERVER_URL)return createServerOnlineController(callbacks);
   const cb={onStatus:callbacks.onStatus||(()=>{}),onLobby:callbacks.onLobby||(()=>{}),onState:callbacks.onState||(()=>{}),onError:callbacks.onError||(()=>{}),onClosed:callbacks.onClosed||(()=>{})};
   const resolvePlace=typeof callbacks.resolvePlace==='function'?callbacks.resolvePlace:null;
   const net={role:'offline',status:'idle',roomCode:'',playerId:'',name:'',mode:'classic',countries:[],peer:null,hostConn:null,guestConnections:new Map(),players:[],state:null,revision:-1,serverRevision:-1,pendingMoveId:null,pendingMove:null,retries:0,reconnectAttempt:0,reconnectReason:'',reconnectTimer:null,sessionId:freshId('s'),connectionSeq:0,connectionId:'',started:false};
