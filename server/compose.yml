@@ -1,0 +1,17 @@
+services:
+  orten:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    ports:
+      - '127.0.0.1:8080:8080'
+    volumes:
+      - orten-data:/var/lib/orten
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:8080/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  orten-data:

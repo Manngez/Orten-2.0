@@ -1,3 +1,6 @@
+> **Aktuell huvudsida:** Orten 3.0 i `v3/`. Se [V3-dokumentationen](v3/README.md).
+> **Ny serverversion:** [Installation och återanslutning](server/README.md). Serverläget kräver separat Node-drift; GitHub Pages använder fortsatt PeerJS.
+
 # Orten 2.0
 
 Orten 2.0 är en ny, fristående version av geografspelet Orten. Spelarna väljer riktiga orter och varje ny ort kopplas till den föregående. En linjekorsning utlöser den valda korsningsregeln.
